@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>等鸟 · 观鸟社区体验版</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+:root {
+  --green:#2e7d4f; --green-light:#e8f5e9; --orange:#ef6c00; --purple:#7b1fa2; --gold:#f9a825;
+  --text:#1f2a24; --muted:#7a8a80; --bg:#eef2ee; --card:#fff; --danger:#c62828;
+}
+body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; background:#d8dfd9; display:flex; justify-content:center; align-items:center; min-height:100vh; color:var(--text); }
+#phone { width:400px; max-width:100vw; height:850px; max-height:100vh; background:var(--bg); display:flex; flex-direction:column; box-shadow:0 10px 40px rgba(0,0,0,.25); position:relative; overflow:hidden; border-radius:18px; }
+
+header { background:var(--green); color:#fff; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; z-index:500; flex-shrink:0; }
+header h1 { font-size:17px; font-weight:600; }
+header .sub { font-size:11px; opacity:.85; margin-top:2px; }
+header .btns { display:flex; gap:8px; }
+.icon-btn { background:rgba(255,255,255,.18); border:none; color:#fff; border-radius:10px; padding:7px 10px; font-size:12px; cursor:pointer; }
+.icon-btn:hover { background:rgba(255,255,255,.3); }
+
+main { flex:1; position:relative; overflow:hidden; }
+.tab { position:absolute; inset:0; overflow-y:auto; display:none; }
+.tab.active { display:block; }
+nav { background:#fff; display:flex; border-top:1px solid #e3e8e4; z-index:500; flex-shrink:0; }
+nav button { flex:1; border:none; background:none; padding:9px 0 12px; font-size:11.5px; color:var(--muted); cursor:pointer; position:relative; }
+nav button .ic { display:block; font-size:17px; margin-bottom:1px; }
+nav button.on { color:var(--green); font-weight:600; }
+nav button.on::after { content:""; position:absolute; top:0; left:50%; transform:translateX(-50%); width:22px; height:3px; border-radius:2px; background:var(--green); }
+
+#map { width:100%; height:100%; background:#e4eadf; }
+.map-fallback { padding:16px; }
+#report-btn { position:absolute; right:14px; bottom:76px; background:var(--green); color:#fff; border:none; border-radius:999px; padding:13px 18px; font-size:14px; font-weight:600; box-shadow:0 4px 14px rgba(46,125,79,.45); cursor:pointer; z-index:600; }
+#refresh-btn { position:absolute; left:14px; bottom:76px; background:#fff; border:none; border-radius:999px; padding:10px 14px; font-size:12px; color:var(--green); box-shadow:0 2px 10px rgba(0,0,0,.15); cursor:pointer; z-index:600; }
+#push-banner { position:absolute; top:10px; left:10px; right:10px; background:#1f2a24; color:#ffd54f; border-radius:12px; padding:11px 14px; font-size:12.5px; z-index:700; display:none; box-shadow:0 6px 20px rgba(0,0,0,.35); cursor:pointer; }
+.bub { width:34px; height:34px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); display:flex; align-items:center; justify-content:center; box-shadow:0 3px 8px rgba(0,0,0,.3); border:2px solid #fff; }
+.bub span { transform:rotate(45deg); font-size:15px; }
+.bub.photo { width:48px; height:48px; border-radius:50%; transform:none; background:#fff3e0; border:3px solid var(--orange); overflow:hidden; }
+.bub.photo span { transform:none; font-size:26px; }
+.bub.wish { width:46px; height:46px; border-radius:50%; transform:none; background:linear-gradient(135deg,#fff8e1,#ffd54f); border:3px solid #f57f17; box-shadow:0 0 14px rgba(249,168,37,.85); animation:pulse 1.6s infinite; }
+.bub.wish span { transform:none; font-size:22px; }
+@keyframes pulse { 0%,100% { box-shadow:0 0 8px rgba(249,168,37,.7);} 50% { box-shadow:0 0 20px rgba(249,168,37,1);} }
+.legend { position:absolute; left:12px; bottom:118px; background:#fff; border-radius:12px; padding:9px 11px; font-size:11px; color:var(--muted); box-shadow:0 2px 10px rgba(0,0,0,.12); z-index:600; line-height:1.9; }
+#live-badge { position:absolute; top:10px; right:10px; background:#fff; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:600; color:var(--green); box-shadow:0 2px 10px rgba(0,0,0,.15); z-index:600; }
+#live-badge::before { content:""; display:inline-block; width:8px; height:8px; border-radius:50%; background:#2ecc40; margin-right:6px; vertical-align:middle; animation:pulse-dot 1.5s infinite; }
+@keyframes pulse-dot { 0%,100% { opacity:1; } 50% { opacity:.3; } }
+.dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; vertical-align:middle; }
+
+.card { background:var(--card); border-radius:14px; padding:14px; margin:12px; box-shadow:0 2px 10px rgba(0,0,0,.06); }
+.chip { display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; margin-right:5px; vertical-align:middle; }
+.chip.green { background:var(--green-light); color:var(--green); }
+.chip.orange { background:#fff3e0; color:var(--orange); }
+.chip.gold { background:#fff8e1; color:#b26a00; }
+.chip.purple { background:#f3e5f5; color:var(--purple); }
+.chip.gray { background:#f0f2f0; color:var(--muted); }
+.chip.red { background:#ffebee; color:var(--danger); }
+
+.sheet-mask { position:absolute; inset:0; background:rgba(0,0,0,.35); z-index:800; display:none; }
+.sheet-mask.show { display:block; }
+.sheet { position:absolute; left:0; right:0; bottom:0; background:#fff; border-radius:18px 18px 0 0; z-index:900; max-height:74%; overflow-y:auto; padding:18px 16px 22px; display:none; }
+.sheet.show { display:block; animation:up .25s ease; }
+@keyframes up { from { transform:translateY(60px); opacity:.4; } to { transform:none; opacity:1; } }
+.sheet h2 { font-size:17px; margin-bottom:2px; }
+.sheet .meta { font-size:12px; color:var(--muted); margin:6px 0 10px; }
+.sheet .desc { font-size:13px; line-height:1.7; color:#42504a; background:var(--bg); border-radius:10px; padding:10px 12px; margin:10px 0; }
+.photo-card { border-radius:14px; overflow:hidden; margin:10px 0; text-align:center; background:#faf6ee; border:1px solid #ece3cf; }
+.photo-card .ph { font-size:72px; line-height:1.3; }
+.photo-card .src { font-size:11.5px; color:var(--muted); padding:0 10px 10px; }
+.row-btns { display:flex; gap:10px; margin:12px 0; flex-wrap:wrap; }
+.pill-btn { border:1px solid #d5ddd7; background:#fff; border-radius:999px; padding:8px 14px; font-size:13px; cursor:pointer; }
+.pill-btn:active { transform:scale(.96); }
+.pill-btn.primary { background:var(--green); color:#fff; border-color:var(--green); font-weight:600; }
+.pill-btn.danger { background:var(--danger); color:#fff; border-color:var(--danger); font-weight:600; }
+.comments { font-size:12.5px; }
+.comments .c { padding:7px 0; border-top:1px solid #f0f2f0; color:#42504a; }
+.comments .c b { color:var(--text); }
+.comment-input { display:flex; gap:8px; margin-top:10px; align-items:center; }
+.comment-input input { flex:1; }
+
+input[type=text], textarea { width:100%; border:1px solid #d5ddd7; border-radius:10px; padding:10px 12px; font-size:14px; outline:none; font-family:inherit; }
+input:focus, textarea:focus { border-color:var(--green); }
+textarea { resize:none; min-height:110px; line-height:1.6; }
+.search-results { max-height:220px; overflow-y:auto; margin-top:8px; }
+.sr-item { padding:10px 12px; border-radius:10px; cursor:pointer; display:flex; align-items:center; gap:8px; font-size:14px; flex-wrap:wrap; }
+.sr-item:hover { background:var(--green-light); }
+.stepper { display:flex; align-items:center; gap:12px; margin:10px 0; }
+.stepper button { width:34px; height:34px; border-radius:50%; border:1px solid #d5ddd7; background:#fff; font-size:17px; cursor:pointer; }
+.label { font-size:13px; color:var(--muted); margin:12px 0 6px; }
+
+/* identify */
+.q-progress { font-size:12px; color:var(--muted); }
+.q-cand { float:right; color:var(--green); font-weight:600; }
+.q-title { font-size:16px; font-weight:600; margin:8px 0 14px; }
+.opt-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.opt-card { border:1.5px solid #d5ddd7; background:#fff; border-radius:12px; padding:10px 6px 8px; cursor:pointer; text-align:center; }
+.opt-card .ic { font-size:26px; line-height:1.5; display:block; }
+.opt-card .ic svg { vertical-align:middle; }
+.opt-card .lb { font-size:12px; color:var(--text); }
+.opt-card.sel { background:var(--green-light); border-color:var(--green); }
+.opt-card.sel .lb { color:var(--green); font-weight:600; }
+.opt-chips { display:flex; flex-wrap:wrap; gap:9px; }
+.opt-chip { border:1.5px solid #d5ddd7; background:#fff; border-radius:999px; padding:9px 15px; font-size:13.5px; cursor:pointer; }
+.opt-chip.sel { background:var(--green); border-color:var(--green); color:#fff; font-weight:600; }
+.swatches { display:flex; flex-wrap:wrap; gap:12px; }
+.swatch { width:38px; height:38px; border-radius:50%; border:3px solid #e0e5e1; cursor:pointer; position:relative; }
+.swatch.sel { border-color:var(--green); box-shadow:0 0 0 2px var(--green); }
+.swatch .lbl { position:absolute; bottom:-18px; left:50%; transform:translateX(-50%); font-size:11px; color:var(--muted); white-space:nowrap; }
+.q-foot { display:flex; justify-content:space-between; margin-top:22px; gap:10px; }
+.link-btn { background:none; border:none; color:var(--green); font-size:13.5px; cursor:pointer; padding:8px; }
+
+.res-item { border:1px solid #e5eae6; border-radius:12px; padding:12px; margin-bottom:10px; }
+.res-item h3 { font-size:15px; margin-bottom:4px; }
+.pt-list { font-size:12.5px; line-height:1.9; margin-top:6px; color:#42504a; }
+.pt-list .ok { color:var(--green); }
+.pt-list .no { color:var(--danger); }
+
+/* community */
+.post { border-bottom:1px solid #f0f2f0; padding:14px 16px; background:#fff; }
+.post .p-head { display:flex; align-items:center; gap:9px; margin-bottom:8px; }
+.post .ava { width:32px; height:32px; border-radius:50%; background:var(--green-light); display:flex; align-items:center; justify-content:center; font-size:16px; }
+.post .p-name { font-size:13px; font-weight:600; }
+.post .p-time { font-size:11px; color:var(--muted); }
+.post .p-body { font-size:13.5px; line-height:1.7; color:#2c3832; }
+.post .p-body img { font-size:40px; display:block; margin-top:6px; }
+.post .p-acts { display:flex; gap:16px; margin-top:10px; font-size:12.5px; color:var(--muted); }
+.post .p-acts span { cursor:pointer; }
+.post .p-acts .liked { color:#e53935; font-weight:600; }
+.post .p-comments { margin-top:8px; background:#f7f9f7; border-radius:10px; padding:8px 10px; font-size:12.5px; display:none; }
+.post .p-comments.show { display:block; }
+.post .p-comments .c { padding:3px 0; color:#42504a; }
+.post .p-comments .c b { color:var(--text); }
+#compose-btn { position:absolute; right:14px; bottom:16px; background:var(--green); color:#fff; border:none; border-radius:999px; padding:12px 17px; font-size:13.5px; font-weight:600; box-shadow:0 4px 14px rgba(46,125,79,.45); cursor:pointer; z-index:600; }
+.community-wrap { position:relative; height:100%; }
+#post-list { padding-bottom:80px; }
+
+/* profile */
+.profile-card { background:linear-gradient(135deg,var(--green),#4a9d6f); border-radius:14px; padding:18px; margin:12px; color:#fff; }
+.profile-card .row { display:flex; align-items:center; gap:14px; }
+.profile-card .big-ava { width:58px; height:58px; border-radius:50%; background:rgba(255,255,255,.25); display:flex; align-items:center; justify-content:center; font-size:30px; cursor:pointer; border:2px solid rgba(255,255,255,.6); }
+.profile-card .pname { font-size:17px; font-weight:600; }
+.profile-card .stats { display:flex; gap:22px; margin-top:14px; font-size:12.5px; }
+.profile-card .stats b { font-size:16px; display:block; }
+.wish-card { background:linear-gradient(135deg,#fff8e1,#ffecb3); border:1.5px solid #f9a825; border-radius:14px; padding:16px; margin:12px; }
+.wish-card h3 { font-size:15px; color:#8a5a00; margin-bottom:4px; }
+.wish-card .wish-progress { font-size:12px; color:#8a5a00; margin-bottom:10px; }
+.wish-chips { display:flex; flex-wrap:wrap; gap:8px; }
+.wish-chips button { border:1.5px solid #e0c060; background:#fff; border-radius:999px; padding:7px 13px; font-size:12.5px; cursor:pointer; }
+.wish-chips button.sel { background:#f9a825; border-color:#f9a825; color:#fff; font-weight:600; }
+.mybirds .bird-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #f0f2f0; font-size:13.5px; }
+.empty-hint { text-align:center; color:var(--muted); font-size:12.5px; padding:20px 0; }
+
+/* modal */
+.modal-mask { position:absolute; inset:0; background:rgba(0,0,0,.45); z-index:1000; display:none; align-items:center; justify-content:center; }
+.modal-mask.show { display:flex; }
+.modal { background:#fff; border-radius:16px; width:88%; max-height:80%; overflow-y:auto; padding:20px; }
+.modal h2 { font-size:16px; margin-bottom:12px; }
+.modal p { font-size:13px; line-height:1.8; color:#42504a; }
+.warn-icon { font-size:40px; text-align:center; margin-bottom:8px; }
+.switch-row { display:flex; align-items:center; justify-content:space-between; padding:10px 0; font-size:14px; border-bottom:1px solid #f0f2f0; }
+.switch-row .s-label small { display:block; color:var(--muted); font-size:11.5px; margin-top:2px; }
+.switch { width:46px; height:26px; border-radius:13px; background:#cfd6d1; position:relative; cursor:pointer; transition:.2s; flex-shrink:0; }
+.switch.on { background:var(--green); }
+.switch::after { content:""; position:absolute; width:20px; height:20px; border-radius:50%; background:#fff; top:3px; left:3px; transition:.2s; }
+.switch.on::after { left:23px; }
+.avatar-pick { display:flex; gap:10px; flex-wrap:wrap; margin:8px 0; }
+.avatar-pick button { font-size:24px; width:44px; height:44px; border-radius:50%; border:2px solid #e0e5e1; background:#fff; cursor:pointer; }
+.avatar-pick button.sel { border-color:var(--green); background:var(--green-light); }
+
+#toast { position:absolute; left:50%; top:14%; transform:translateX(-50%); background:rgba(31,42,36,.92); color:#fff; font-size:13px; padding:10px 18px; border-radius:999px; z-index:1200; display:none; max-width:86%; text-align:center; }
+.demo-note { font-size:10.5px; color:var(--muted); text-align:center; padding:6px 0 10px; }
+</style>
+</head>
+<body>
+<div id="phone">
+  <header>
+    <div>
+      <h1>等鸟<span style="font-size:11px;opacity:.8">（体验版）</span></h1>
+      <div class="sub">🐦 新手观鸟社区 · 北京</div>
+    </div>
+    <div class="btns">
+      <button class="icon-btn" onclick="openSettings()">🔔</button>
+      <button class="icon-btn" onclick="openDemoNote()">❓</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="push-banner" onclick="this.style.display='none'"></div>
+
+    <!-- 鸟讯地图 -->
+    <section class="tab active" id="tab-map">
+      <div id="map"></div>
+      <div id="live-badge">🟢 实时鸟况 · 24 小时内</div>
+      <div class="legend" id="map-legend">
+        <div><span class="dot" style="background:var(--green)"></span>常见鸟（随机展示）</div>
+        <div><span class="dot" style="background:var(--orange)"></span>罕见鸟 · 照片气泡</div>
+        <div><span class="dot" style="background:var(--gold)"></span>⭐ 我的心愿鸟</div>
+        <div><span class="dot" style="background:var(--purple)"></span>待鉴定 · 社区帮认</div>
+      </div>
+      <button id="refresh-btn" onclick="refreshCommon()">🔄 换一批常见鸟</button>
+      <button id="report-btn" onclick="openReport()">＋ 我看到了鸟</button>
+    </section>
+
+    <!-- 识鸟 -->
+    <section class="tab" id="tab-identify">
+      <div class="card">
+        <div class="q-progress"><span id="q-idx">第 1 / 12 题</span><span class="q-cand" id="q-cand"></span></div>
+        <div class="q-title" id="q-title"></div>
+        <div id="q-body"></div>
+        <div class="q-foot">
+          <button class="link-btn" id="q-prev" onclick="prevQ()">← 上一题</button>
+          <button class="link-btn" onclick="skipQ()">不确定，跳过 →</button>
+        </div>
+        <div style="text-align:center;margin-top:14px">
+          <button class="pill-btn primary" onclick="showResults()">直接看结果</button>
+          <button class="pill-btn" onclick="resetIdentify()" style="margin-left:8px">重新开始</button>
+        </div>
+      </div>
+      <div id="res-area"></div>
+    </section>
+
+    <!-- 社区 -->
+    <section class="tab" id="tab-community">
+      <div class="community-wrap">
+        <div id="post-list"></div>
+        <button id="compose-btn" onclick="openCompose()">✍️ 发帖</button>
+      </div>
+    </section>
+
+    <!-- 本地鸟种手册 -->
+    <section class="tab" id="tab-handbook">
+      <div class="card">
+        <div class="label">查看区域</div>
+        <div class="opt-chips">
+          <button class="opt-chip sel" data-hb="全市">北京 · 全市</button>
+          <button class="opt-chip" data-hb="海淀区">海淀区</button>
+          <button class="opt-chip" data-hb="朝阳区">朝阳区</button>
+        </div>
+        <div class="label">筛选</div>
+        <div class="hb-filter">
+          <button class="opt-chip sel" data-f="all">全部</button>
+          <button class="opt-chip" data-f="common">常见</button>
+          <button class="opt-chip" data-f="rare">罕见/保护</button>
+          <button class="opt-chip" data-f="ebird">eBird 参考</button>
+        </div>
+      </div>
+      <div id="hb-list"></div>
+      <div class="demo-note">过去 30 天 · 数据为演示用（平台记录 + eBird 参考）</div>
+    </section>
+
+    <!-- 我的 -->
+    <section class="tab" id="tab-profile">
+      <div class="profile-card">
+        <div class="row">
+          <div class="big-ava" onclick="openAvatarPick()" id="my-ava">🐣</div>
+          <div>
+            <div class="pname" id="my-name">观鸟小白</div>
+            <div style="font-size:12px;opacity:.85">北京 · 鸟龄 2 个月</div>
+          </div>
+        </div>
+        <div class="stats">
+          <div><b id="stat-reports">0</b>上报</div>
+          <div><b id="stat-checks">2</b>打卡</div>
+          <div><b id="stat-birds">0</b>鸟种库</div>
+          <div><b id="stat-likes">3</b>获赞</div>
+        </div>
+      </div>
+
+      <div class="wish-card" id="wish-card">
+        <h3>⭐ 我的心愿鸟</h3>
+        <div class="wish-progress">标记 5 种最想见到的鸟，它一出现就强提醒你（<span id="wish-count">2</span>/5）</div>
+        <div class="wish-chips" id="wish-chips"></div>
+        <div style="margin-top:10px"><button class="pill-btn" style="border-color:#e0c060;width:100%" onclick="openWishSearch()">🔍 搜索添加心愿鸟</button></div>
+      </div>
+
+      <div class="card">
+        <div class="switch-row" style="border:none" onclick="openSettings()" >
+          <div class="s-label">🔔 提醒设置<small>罕见鸟 / 心愿鸟 推送规则</small></div>
+          <div style="color:var(--muted)">›</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="font-size:14px;margin-bottom:8px">📖 我的鸟种库</h3>
+        <div id="my-birds" class="mybirds"></div>
+      </div>
+      <div class="demo-note">正式版使用微信登录，这里演示昵称/头像/心愿鸟设置</div>
+    </section>
+
+    <!-- 鸟讯详情 sheet -->
+    <div class="sheet-mask" id="sheet-mask" onclick="closeSheet()"></div>
+    <div class="sheet" id="sheet"></div>
+
+    <!-- 上报 modal -->
+    <div class="modal-mask" id="report-mask" onclick="if(event.target===this)closeReport()">
+      <div class="modal" id="report-modal"></div>
+    </div>
+
+    <!-- 拦截 modal -->
+    <div class="modal-mask" id="block-mask">
+      <div class="modal" id="block-modal"></div>
+    </div>
+
+    <!-- 发帖 modal -->
+    <div class="modal-mask" id="compose-mask" onclick="if(event.target===this)closeCompose()">
+      <div class="modal" id="compose-modal"></div>
+    </div>
+
+    <!-- 提醒设置 modal -->
+    <div class="modal-mask" id="settings-mask" onclick="if(event.target===this)closeSettings()">
+      <div class="modal" id="settings-modal"></div>
+    </div>
+
+    <!-- 头像选择 modal -->
+    <div class="modal-mask" id="avatar-mask" onclick="if(event.target===this)this.classList.remove('show')">
+      <div class="modal" id="avatar-modal"></div>
+    </div>
+
+    <!-- 心愿鸟搜索 modal -->
+    <div class="modal-mask" id="wish-mask" onclick="if(event.target===this)this.classList.remove('show')">
+      <div class="modal" id="wish-modal"></div>
+    </div>
+
+    <!-- 演示说明 modal -->
+    <div class="modal-mask" id="note-mask" onclick="this.classList.remove('show')">
+      <div class="modal" id="note-modal"></div>
+    </div>
+  </main>
+
+  <nav>
+    <button class="on" data-tab="tab-map" onclick="switchTab('tab-map')"><span class="ic">🗺️</span>鸟讯</button>
+    <button data-tab="tab-identify" onclick="switchTab('tab-identify')"><span class="ic">🔍</span>识鸟</button>
+    <button data-tab="tab-community" onclick="switchTab('tab-community')"><span class="ic">💬</span>社区</button>
+    <button data-tab="tab-handbook" onclick="switchTab('tab-handbook')"><span class="ic">📖</span>本地鸟种</button>
+    <button data-tab="tab-profile" onclick="switchTab('tab-profile')"><span class="ic">👤</span>我的</button>
+  </nav>
+  <div id="toast"></div>
+</div>
+
+<script>
+/* ============ 数据 ============ */
+const COLORS = ['黑','白','灰','棕','红','橙','黄','绿','蓝'];
+const SWATCH_COLORS = {黑:'#212121',白:'#f5f5f5',灰:'#9e9e9e',棕:'#8d6e63',红:'#d32f2f',橙:'#f57c00',黄:'#fbc02d',绿:'#388e3c',蓝:'#1976d2'};
+const SIZES = {sparrow:'麻雀大小', dove:'鸽子大小', crow:'乌鸦大小', chicken:'鸡大小', duck:'鸭子大小', crane:'鹤大小'};
+const SIZE_ICONS = {sparrow:'🐤', dove:'🐦', crow:'🐦‍⬛', chicken:'🐔', duck:'🦆', crane:'🦢'};
+const SIZE_PX = {sparrow:22, dove:30, crow:38, chicken:42, duck:46, crane:58};
+const GROUPS = {songbird:'像麻雀', waterfowl:'像鸭子', wader:'像鹭鸶', galliform:'像鸡', raptor:'像鹰', woodpecker:'像啄木鸟'};
+const GROUP_ICONS = {songbird:'🐦', waterfowl:'🦆', wader:'🦢', galliform:'🐔', raptor:'🦅', woodpecker:'🐦'};
+const BEAKS = {cone:'锥形嘴', slender:'细长嘴', hooked:'钩状嘴', spatulate:'扁宽嘴', stout:'短粗嘴'};
+const BEAK_SVG = {
+  cone:'<svg width="44" height="26" viewBox="0 0 44 26"><path d="M4 5 L24 13 L4 21 Z" fill="none" stroke="#333" stroke-width="2.2"/><path d="M2 2 Q22 2 26 13 Q22 24 2 24" fill="none" stroke="#999" stroke-width="1.5" stroke-dasharray="3 2"/></svg>',
+  slender:'<svg width="44" height="26" viewBox="0 0 44 26"><path d="M4 10 L38 12.4 L38 14 L4 17 Z" fill="none" stroke="#333" stroke-width="2.2"/><path d="M2 2 Q20 2 24 13 Q20 24 2 24" fill="none" stroke="#999" stroke-width="1.5" stroke-dasharray="3 2"/></svg>',
+  hooked:'<svg width="44" height="26" viewBox="0 0 44 26"><path d="M4 8 Q14 6 22 10 Q30 13 32 15 Q30 20 24 19 Q16 17 10 18 Q5 18 4 19 Z" fill="none" stroke="#333" stroke-width="2.2"/><path d="M2 2 Q20 2 24 13 Q20 24 2 24" fill="none" stroke="#999" stroke-width="1.5" stroke-dasharray="3 2"/></svg>',
+  spatulate:'<svg width="44" height="26" viewBox="0 0 44 26"><path d="M4 10 L30 10 Q38 13 30 17 L4 17 Z" fill="none" stroke="#333" stroke-width="2.2"/><path d="M2 2 Q18 2 22 13 Q18 24 2 24" fill="none" stroke="#999" stroke-width="1.5" stroke-dasharray="3 2"/></svg>',
+  stout:'<svg width="44" height="26" viewBox="0 0 44 26"><path d="M4 8 Q10 7 16 9 Q20 13 15 16 Q9 18 4 17 Z" fill="none" stroke="#333" stroke-width="2.4"/><path d="M2 2 Q18 2 22 13 Q18 24 2 24" fill="none" stroke="#999" stroke-width="1.5" stroke-dasharray="3 2"/></svg>'
+};
+const TAILS = ['长尾','中长尾','短尾'];
+const TAILSHAPES = ['叉形','圆形','楔形','竖尾'];
+const TAIL_SVG = {
+  '叉形':'<svg width="40" height="30" viewBox="0 0 40 30"><path d="M6 4 L20 27 L34 4" fill="none" stroke="#333" stroke-width="2.4" stroke-linecap="round"/></svg>',
+  '圆形':'<svg width="40" height="30" viewBox="0 0 40 30"><path d="M6 14 A14 14 0 0 1 34 14 Z" fill="none" stroke="#333" stroke-width="2.4"/></svg>',
+  '楔形':'<svg width="40" height="30" viewBox="0 0 40 30"><path d="M4 12 L20 28 L36 12 Z" fill="none" stroke="#333" stroke-width="2.4"/></svg>',
+  '竖尾':'<svg width="40" height="30" viewBox="0 0 40 30"><path d="M8 28 Q14 10 18 3 Q24 12 32 28" fill="none" stroke="#333" stroke-width="2.4" stroke-linecap="round"/></svg>'
+};
+const MARKS = ['冠羽','眼纹','翼斑','白腰','长颈','长腿','胸带','颈斑'];
+const MARK_ICONS = {'冠羽':'👑','眼纹':'🕶️','翼斑':'🪶','白腰':'⬜','长颈':'🦒','长腿':'🦵','胸带':'👔','颈斑':'📿'};
+const ENVS = ['城市公园/小区','水边','树林','草地/农田'];
+const ENV_ICONS = {'城市公园/小区':'🏙️','水边':'💧','树林':'🌲','草地/农田':'🌾'};
+const PROT = {0:['常见','gray'], 1:['国家一级','red'], 2:['国家二级','orange']};
+
+const SPECIES = [
+ {id:1,name:'麻雀',emoji:'🐦',size:'sparrow',group:'songbird',face:'白',wing:'棕',belly:'白',beak:'cone',tail:'中长尾',tailShape:'圆形',marks:[],env:'城市公园/小区',prot:0,rarity:'common',regionalRare:false,season:'R',prov:['北京','青海'],similar:['白头鹎'],desc:'脸颊有黑斑，成群活动，蹦跳行走。'},
+ {id:2,name:'喜鹊',emoji:'🐦',size:'crow',group:'songbird',face:'黑',wing:'黑',belly:'白',beak:'cone',tail:'长尾',tailShape:'楔形',marks:[],env:'城市公园/小区',prot:0,rarity:'common',regionalRare:false,season:'R',prov:['北京','青海'],similar:['灰喜鹊'],desc:'黑白分明，长尾楔形，带金属蓝绿光泽。'},
+ {id:3,name:'灰喜鹊',emoji:'🐦',size:'dove',group:'songbird',face:'黑',wing:'蓝',belly:'白',beak:'cone',tail:'长尾',tailShape:'楔形',marks:[],env:'城市公园/小区',prot:0,rarity:'common',regionalRare:false,season:'R',prov:['北京','青海'],similar:['喜鹊'],desc:'头顶黑色，背部灰蓝，尾长，成群喧闹。'},
+ {id:4,name:'白头鹎',emoji:'🐦',size:'sparrow',group:'songbird',face:'白',wing:'绿',belly:'白',beak:'cone',tail:'中长尾',tailShape:'圆形',marks:[],env:'城市公园/小区',prot:0,rarity:'common',regionalRare:false,season:'R',prov:['北京'],similar:['麻雀'],desc:'头顶黑色、枕部白色，叫声响亮婉转。'},
+ {id:5,name:'珠颈斑鸠',emoji:'🕊️',size:'dove',group:'songbird',face:'灰',wing:'灰',belly:'灰',beak:'stout',tail:'中长尾',tailShape:'圆形',marks:['颈斑'],env:'城市公园/小区',prot:0,rarity:'common',regionalRare:false,season:'R',prov:['北京'],similar:[],desc:'颈侧有布满白点的黑斑，"咕咕咕"叫。'},
+ {id:6,name:'戴胜',emoji:'🐦',size:'dove',group:'songbird',face:'棕',wing:'黑',belly:'棕',beak:'slender',tail:'中长尾',tailShape:'圆形',marks:['冠羽'],env:'草地/农田',prot:0,rarity:'uncommon',regionalRare:false,season:'R',prov:['北京'],similar:[],desc:'头顶羽冠展开如扇，黑白斑纹翅膀，长弯嘴。'},
+ {id:7,name:'乌鸫',emoji:'🐦',size:'dove',group:'songbird',face:'黑',wing:'黑',belly:'黑',beak:'cone',tail:'中长尾',tailShape:'圆形',marks:[],env:'城市公园/小区',prot:0,rarity:'common',regionalRare:false,season:'R',prov:['北京'],similar:[],desc:'全身黑、嘴橙黄，擅长模仿鸣唱。'},
+ {id:8,name:'红嘴蓝鹊',emoji:'🐦',size:'crow',group:'songbird',face:'黑',wing:'蓝',belly:'白',beak:'cone',tail:'长尾',tailShape:'楔形',marks:[],env:'树林',prot:0,rarity:'uncommon',regionalRare:false,season:'R',prov:['北京'],similar:['喜鹊'],desc:'红嘴红脚，尾极长，背翅蓝灰色。'},
+ {id:9,name:'大斑啄木鸟',emoji:'🐦',size:'dove',group:'woodpecker',face:'白',wing:'黑',belly:'白',beak:'slender',tail:'中长尾',tailShape:'楔形',marks:['翼斑'],env:'树林',prot:0,rarity:'uncommon',regionalRare:false,season:'R',prov:['北京'],similar:[],desc:'黑白花翅膀，雄鸟枕部有红斑，攀树啄木。'},
+ {id:10,name:'绿头鸭',emoji:'🦆',size:'duck',group:'waterfowl',face:'绿',wing:'棕',belly:'灰',beak:'spatulate',tail:'短尾',tailShape:'圆形',marks:[],env:'水边',prot:0,rarity:'common',regionalRare:false,season:'R',prov:['北京'],similar:['斑嘴鸭'],desc:'雄鸟头颈绿色、颈部白环，翼镜蓝紫。'},
+ {id:11,name:'鸳鸯',emoji:'🦆',size:'duck',group:'waterfowl',face:'棕',wing:'橙',belly:'白',beak:'cone',tail:'短尾',tailShape:'圆形',marks:[],env:'水边',prot:2,rarity:'uncommon',regionalRare:false,season:'R',prov:['北京'],similar:[],desc:'雄鸟有橙红色帆状饰羽，色彩艳丽。'},
+ {id:12,name:'夜鹭',emoji:'🦢',size:'chicken',group:'wader',face:'白',wing:'灰',belly:'白',beak:'slender',tail:'短尾',tailShape:'圆形',marks:['长腿'],env:'水边',prot:0,rarity:'common',regionalRare:false,season:'R',prov:['北京'],similar:['白鹭'],desc:'头顶和背深色，成鸟灰白，常缩着脖子站立。'},
+ {id:13,name:'白鹭',emoji:'🦢',size:'chicken',group:'wader',face:'白',wing:'白',belly:'白',beak:'slender',tail:'短尾',tailShape:'圆形',marks:['长腿','长颈'],env:'水边',prot:0,rarity:'common',regionalRare:false,season:'S',prov:['北京'],similar:['夜鹭'],desc:'全身雪白，细长黑喙黄爪，飞行时缩颈。'},
+ {id:14,name:'苍鹭',emoji:'🦢',size:'crane',group:'wader',face:'灰',wing:'灰',belly:'灰',beak:'slender',tail:'短尾',tailShape:'圆形',marks:['长腿','长颈'],env:'水边',prot:0,rarity:'common',regionalRare:false,season:'R',prov:['北京'],similar:['灰鹤'],desc:'大型灰鹭，站在水边像一尊雕像。'},
+ {id:15,name:'小䴙䴘',emoji:'🦆',size:'sparrow',group:'waterfowl',face:'棕',wing:'棕',belly:'白',beak:'cone',tail:'短尾',tailShape:'圆形',marks:[],env:'水边',prot:0,rarity:'common',regionalRare:false,season:'R',prov:['北京'],similar:[],desc:'潜水高手，几乎看不出尾巴，常整只潜入水中。'},
+ {id:16,name:'普通翠鸟',emoji:'💎',size:'sparrow',group:'songbird',face:'蓝',wing:'蓝',belly:'橙',beak:'slender',tail:'短尾',tailShape:'圆形',marks:[],env:'水边',prot:0,rarity:'uncommon',regionalRare:false,season:'R',prov:['北京'],similar:[],desc:'宝石蓝背、橙红腹，像闪电掠过水面。'},
+ {id:17,name:'金腰燕',emoji:'🐦',size:'sparrow',group:'songbird',face:'棕',wing:'黑',belly:'白',beak:'cone',tail:'中长尾',tailShape:'叉形',marks:[],env:'城市公园/小区',prot:0,rarity:'common',regionalRare:false,season:'S',prov:['北京'],similar:['家燕'],desc:'腰部金黄色，腹部有纵纹，飞行敏捷。'},
+ {id:18,name:'家燕',emoji:'🐦',size:'sparrow',group:'songbird',face:'红',wing:'黑',belly:'白',beak:'cone',tail:'长尾',tailShape:'叉形',marks:[],env:'城市公园/小区',prot:0,rarity:'common',regionalRare:false,season:'S',prov:['北京'],similar:['金腰燕'],desc:'额喉栗红色，剪刀状深叉尾。'},
+ {id:19,name:'北红尾鸲',emoji:'🐦',size:'sparrow',group:'songbird',face:'灰',wing:'黑',belly:'橙',beak:'cone',tail:'中长尾',tailShape:'圆形',marks:['翼斑'],env:'城市公园/小区',prot:0,rarity:'common',regionalRare:false,season:'S',prov:['北京'],similar:[],desc:'尾羽橙红并不断抖动，雄鸟黑脸白头。'},
+ {id:20,name:'红喉歌鸲',emoji:'🐦',size:'sparrow',group:'songbird',face:'灰',wing:'棕',belly:'红',beak:'cone',tail:'中长尾',tailShape:'圆形',marks:[],env:'树林',prot:2,rarity:'uncommon',regionalRare:false,season:'S',prov:['北京'],similar:[],desc:'喉部鲜红色，眉纹白色，喜欢在灌丛地面活动。'},
+ {id:21,name:'银喉长尾山雀',emoji:'🐦',size:'sparrow',group:'songbird',face:'白',wing:'黑',belly:'白',beak:'cone',tail:'长尾',tailShape:'楔形',marks:[],env:'树林',prot:0,rarity:'uncommon',regionalRare:false,season:'R',prov:['北京'],similar:[],desc:'圆头白脸的小可爱，尾巴很长，成群活动。'},
+ {id:22,name:'大山雀',emoji:'🐦',size:'sparrow',group:'songbird',face:'白',wing:'灰',belly:'黄',beak:'cone',tail:'中长尾',tailShape:'圆形',marks:['胸带'],env:'树林',prot:0,rarity:'common',regionalRare:false,season:'R',prov:['北京'],similar:[],desc:'白脸黑头，腹部黄色，胸口一条"黑领带"。'},
+ {id:23,name:'宝兴歌鸲',emoji:'🎵',size:'sparrow',group:'songbird',face:'棕',wing:'棕',belly:'白',beak:'cone',tail:'中长尾',tailShape:'圆形',marks:['眼纹'],env:'树林',prot:0,rarity:'rare',regionalRare:true,season:'S',prov:['北京'],similar:[],desc:'棕褐色鸲类，白色眉纹醒目、下体有鳞状斑。在北京极少出现，每次现身都引来大批鸟友。'},
+ {id:24,name:'黄胸鹀',emoji:'🐦',size:'sparrow',group:'songbird',face:'黑',wing:'棕',belly:'黄',beak:'cone',tail:'中长尾',tailShape:'圆形',marks:[],env:'草地/农田',prot:1,rarity:'rare',regionalRare:false,season:'S',prov:['北京'],similar:[],desc:'雄鸟头黑、胸腹鲜黄。曾因"禾花雀"被大量捕食，现已极度濒危。'},
+ {id:25,name:'金雕',emoji:'🦅',size:'crane',group:'raptor',face:'棕',wing:'棕',belly:'棕',beak:'hooked',tail:'中长尾',tailShape:'圆形',marks:[],env:'草地/农田',prot:1,rarity:'rare',regionalRare:false,season:'R',prov:['北京','青海'],similar:[],desc:'大型猛禽，翼展可达两米，空中霸主。'},
+ {id:26,name:'灰鹤',emoji:'🦢',size:'crane',group:'wader',face:'灰',wing:'灰',belly:'灰',beak:'slender',tail:'短尾',tailShape:'圆形',marks:['长颈','长腿'],env:'草地/农田',prot:2,rarity:'uncommon',regionalRare:false,season:'W',prov:['北京'],similar:['苍鹭'],desc:'大型鹤，头顶裸露红色，飞行时颈伸直，与苍鹭缩颈不同。'},
+ {id:27,name:'黑水鸡',emoji:'🐔',size:'dove',group:'waterfowl',face:'红',wing:'黑',belly:'黑',beak:'stout',tail:'短尾',tailShape:'圆形',marks:[],env:'水边',prot:0,rarity:'common',regionalRare:false,season:'R',prov:['北京'],similar:[],desc:'额甲红色，尾下白斑，在水边踱步。'},
+ {id:28,name:'凤头䴙䴘',emoji:'🦆',size:'duck',group:'waterfowl',face:'白',wing:'棕',belly:'白',beak:'cone',tail:'短尾',tailShape:'圆形',marks:['冠羽'],env:'水边',prot:0,rarity:'common',regionalRare:false,season:'S',prov:['北京'],similar:[],desc:'头两侧有黑色羽冠，繁殖期跳求偶舞蹈。'},
+ {id:29,name:'黑脸琵鹭',emoji:'🦢',size:'crane',group:'wader',face:'黑',wing:'白',belly:'白',beak:'spatulate',tail:'短尾',tailShape:'圆形',marks:['长腿','长颈'],env:'水边',prot:1,rarity:'rare',regionalRare:false,season:'R',prov:['北京'],similar:['白鹭'],desc:'黑色脸部，嘴像一把扁平的饭勺，左右扫水觅食。'},
+ {id:30,name:'斑嘴鸭',emoji:'🦆',size:'duck',group:'waterfowl',face:'棕',wing:'棕',belly:'棕',beak:'spatulate',tail:'短尾',tailShape:'圆形',marks:[],env:'水边',prot:0,rarity:'common',regionalRare:false,season:'R',prov:['北京'],similar:['绿头鸭'],desc:'嘴黄色尖端黑，翼镜蓝紫色，雌雄相似。'},
+ {id:31,name:'斑尾榛鸡',emoji:'🐔',size:'chicken',group:'galliform',face:'棕',wing:'棕',belly:'棕',beak:'cone',tail:'中长尾',tailShape:'圆形',marks:[],env:'树林',prot:1,rarity:'rare',regionalRare:false,season:'R',prov:['青海'],similar:[],desc:'青海高原林下的雄鸡，斑纹细密，晨昏鸣叫。'},
+ {id:32,name:'黑颈鹤',emoji:'🦢',size:'crane',group:'wader',face:'白',wing:'灰',belly:'白',beak:'slender',tail:'短尾',tailShape:'圆形',marks:['长颈','长腿'],env:'草地/农田',prot:1,rarity:'rare',regionalRare:false,season:'S',prov:['青海'],similar:[],desc:'颈黑色、眼后有白斑，高原神鸟，迁徙到青藏高原繁殖。'},
+ {id:33,name:'大鵟',emoji:'🦅',size:'crow',group:'raptor',face:'棕',wing:'棕',belly:'棕',beak:'hooked',tail:'中长尾',tailShape:'圆形',marks:[],env:'草地/农田',prot:2,rarity:'uncommon',regionalRare:false,season:'R',prov:['青海'],similar:[],desc:'高原常见猛禽，翼下有大块白斑，常蹲在电线杆上。'}
+];
+const byId = Object.fromEntries(SPECIES.map(s=>[s.id,s]));
+const byName = Object.fromEntries(SPECIES.map(s=>[s.name,s]));
+function spIsRare(sp){ return sp && (sp.prot>=2 || sp.rarity==='rare' || sp.regionalRare); }
+function spIsWish(sp){ return sp && settings.wishes.includes(sp.name); }
+
+/* 鸟讯（分钟前） */
+const SIGHTINGS = [
+ {id:1,sp:2,min:20,lat:39.9991,lng:116.3906,count:2,reporter:'鸟友小北',likes:12,checks:3,comments:[{u:'观鸟小白',t:'就在奥森南门，感谢分享！'},{u:'老鹰眼',t:'这只尾羽好长，拍到了吗'}]},
+ {id:2,sp:3,min:60,lat:39.9931,lng:116.3841,count:5,reporter:'海淀观鸟人',likes:5,checks:1,comments:[]},
+ {id:3,sp:4,min:180,lat:39.9919,lng:116.3965,count:3,reporter:'小麻雀酱',likes:8,checks:2,comments:[{u:'观鸟小白',t:'我认成麻雀了哈哈'}]},
+ {id:4,sp:5,min:300,lat:39.9973,lng:116.3833,count:1,reporter:'咕咕咕',likes:3,checks:0,comments:[]},
+ {id:5,sp:9,min:480,lat:39.9952,lng:116.3769,count:1,reporter:'老鹰眼',likes:15,checks:4,comments:[{u:'木木',t:'找了三天终于看到！'}]},
+ {id:6,sp:16,min:720,lat:39.9902,lng:116.3921,count:1,reporter:'海淀观鸟人',likes:21,checks:6,comments:[{u:'观鸟小白',t:'蓝得发光！'}]},
+ {id:7,sp:11,min:1080,lat:39.9887,lng:116.3899,count:2,reporter:'匿名鸟友',likes:9,checks:2,comments:[]},
+ {id:8,sp:10,min:1320,lat:39.9964,lng:116.3952,count:8,reporter:'小麻雀酱',likes:4,checks:1,comments:[]},
+ {id:9,sp:null,min:45,lat:39.9942,lng:116.3872,count:1,unknown:'褐色小鸟，比麻雀大一点，头顶有点翘',reporter:'新手小圆',likes:6,checks:0,comments:[{u:'老鹰眼',t:'听描述像北红尾鸲，建议发鉴定帖'}]},
+ {id:10,sp:26,min:35,lat:39.9923,lng:116.3796,count:3,userPhoto:false,reporter:'匿名鸟友',likes:18,checks:5,comments:[{u:'观鸟小白',t:'冬天才常见的鹤，现在居然有！'},{u:'老鹰眼',t:'已到，在芦苇荡东侧'}]},
+ {id:11,sp:20,min:120,lat:39.9968,lng:116.3861,count:1,userPhoto:true,reporter:'匿名鸟友',likes:11,checks:3,comments:[]},
+ {id:12,sp:15,min:360,lat:39.9908,lng:116.3942,count:2,reporter:'咕咕咕',likes:7,checks:2,comments:[]},
+ {id:13,sp:12,min:240,lat:39.9979,lng:116.3919,count:1,reporter:'木木',likes:6,checks:1,comments:[]},
+ {id:14,sp:23,min:50,lat:39.9934,lng:116.3886,count:1,userPhoto:true,reporter:'老法师',likes:89,checks:23,comments:[{u:'炮队队长',t:'八年了！北京居然出宝兴歌鸲！'},{u:'老法师',t:'位置奥森北园，速来'},{u:'观鸟小白',t:'今天老法师们好激动'}]},
+ {id:15,sp:13,min:1500,lat:39.9937,lng:116.3901,count:1,reporter:'海淀观鸟人',likes:3,checks:0,comments:[]}
+];
+
+/* 社区帖子 */
+let POSTS = [
+ {id:1,cat:'求助鉴定',author:'新手小圆',avatar:'🐣',minAgo:52,body:'今天在奥森看到一只褐色小鸟，比麻雀大一点，头顶有点翘，尾巴一抖一抖的。大家帮我看看是什么鸟？',emoji:'❓',likes:4,liked:false,comments:[{u:'老鹰眼',t:'听描述像北红尾鸲，雄鸟头顶有白斑，尾羽橙红爱抖尾，可以对照一下'},{u:'新手小圆',t:'对对对！尾巴是橙红色的！谢谢大佬'}]},
+ {id:2,cat:'鸟讯讨论',author:'老法师',avatar:'📷',minAgo:38,body:'【宝兴歌鸲】奥森北园！北京多年未见的区域罕见鸟，今天现身！提醒：请勿使用诱拍、播放录音，文明观鸟。',emoji:'🎵',likes:56,liked:false,comments:[{u:'炮队队长',t:'赶到！蹲到了，感恩'},{u:'观鸟小白',t:'请问要几点去比较好？'},{u:'老法师',t:'清晨和傍晚活动最活跃'}]},
+ {id:3,cat:'新手交流',author:'观鸟小白',avatar:'🐣',minAgo:200,body:'新手求教：怎么区分喜鹊和灰喜鹊？感觉长得差不多，都是黑白长尾巴。',emoji:'🙋',likes:9,liked:false,comments:[{u:'海淀观鸟人',t:'看背色！灰喜鹊背是灰蓝色的，体型更小；喜鹊黑白分明带蓝绿光泽，而且体型大不少'}]},
+ {id:4,cat:'自由分享',author:'小麻雀酱',avatar:'🌸',minAgo:1500,body:'今日份小确幸：翠鸟站在荷杆上，蓝得像宝石。附上我今天的记录～',emoji:'💎',likes:23,liked:false,comments:[{u:'木木',t:'哪里拍的？求位置'},{u:'小麻雀酱',t:'奥森南园湿地～'}]}
+];
+
+/* 我的 */
+let my = {nickname:'观鸟小白', avatar:'🐣', birds:[]};
+let settings = {t1:true,t2:true,t3:true,wishes:['灰鹤','宝兴歌鸲']};
+let myStats = {reports:0, checks:2, likes:3};
+
+/* ============ 工具 ============ */
+const $ = id => document.getElementById(id);
+let toastTimer;
+function toast(msg, ms=2400){
+  const t = $('toast'); t.textContent = msg; t.style.display = 'block';
+  clearTimeout(toastTimer); toastTimer = setTimeout(()=>t.style.display='none', ms);
+}
+function switchTab(tab){
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on', b.dataset.tab===tab));
+  document.querySelectorAll('.tab').forEach(s=>s.classList.toggle('active', s.id===tab));
+  if(tab==='tab-map' && map) setTimeout(()=>map.invalidateSize(), 60);
+}
+function fmtMin(m){
+  if(m<60) return m+'分钟前';
+  if(m<1440) return Math.floor(m/60)+'小时前';
+  return Math.floor(m/1440)+'天前';
+}
+function distText(){ return (0.3+Math.random()*3).toFixed(1)+'km'; }
+
+/* ============ 地图 ============ */
+let map = null, markerLayer = null;
+function initMap(){
+  if(typeof L === 'undefined'){
+    $('map').innerHTML = '<div class="map-fallback"><h3>地图底图加载失败（需联网）</h3><div id="fb-list"></div></div>';
+    let html = '';
+    SIGHTINGS.filter(s=>s.min<=1440).forEach(s=>{
+      html += `<div class="hb-item"><div class="l"><span>${s.sp?byId[s.sp].name:'❓ 未识别鸟 · 待鉴定'}</span></div><div class="r">${fmtMin(s.min)}</div></div>`;
+    });
+    $('map').querySelector('#fb-list').innerHTML = html;
+    return;
+  }
+  map = L.map('map').setView([39.995,116.391],14);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:19,attribution:'© OSM © CARTO'}).addTo(map);
+  renderSightings();
+}
+function bubbleIcon(sp, unknown){
+  if(!sp){ return L.divIcon({className:'',html:'<div class="bub" style="background:var(--purple)"><span>?</span></div>',iconSize:[34,34],iconAnchor:[17,17]}); }
+  if(spIsWish(sp)){
+    return L.divIcon({className:'',html:`<div class="bub wish"><span>⭐</span></div>`,iconSize:[46,46],iconAnchor:[23,23]});
+  }
+  if(spIsRare(sp)){
+    return L.divIcon({className:'',html:`<div class="bub photo"><span>${sp.emoji}</span></div>`,iconSize:[48,48],iconAnchor:[24,24]});
+  }
+  let inner = sp.emoji || '🐦';
+  return L.divIcon({className:'',html:`<div class="bub" style="background:var(--green)"><span>${inner}</span></div>`,iconSize:[34,34],iconAnchor:[17,17]});
+}
+function renderSightings(){
+  if(!map) return;
+  if(markerLayer) markerLayer.remove();
+  markerLayer = L.layerGroup().addTo(map);
+  SIGHTINGS.forEach(s=>{
+    if(s.min>1440) return; // 24h 过期不显示
+    const sp = s.sp ? byId[s.sp] : null;
+    const ll = [s.lat,s.lng];
+    // 常见鸟随机展示（太多的话刷屏）；罕见鸟/心愿鸟/待鉴定全部展示
+    const isCommon = sp && !spIsRare(sp) && !spIsWish(sp);
+    if(isCommon && Math.random() < 0.35) return;
+    const mk = L.marker(ll,{icon:bubbleIcon(sp,!s.sp)});
+    mk.on('click',()=>openDetail(s));
+    markerLayer.addLayer(mk);
+  });
+}
+function refreshCommon(){ renderSightings(); toast('已随机换一批常见鸟气泡 🐦'); }
+function addSightingMarker(sp){
+  const ll = [39.995+(Math.random()-0.5)*0.02, 116.391+(Math.random()-0.5)*0.02];
+  SIGHTINGS.push({id:99+Math.random(),sp:sp.id,min:0,lat:ll[0],lng:ll[1],count:1,userPhoto:true,reporter:my.nickname,likes:0,checks:0,comments:[]});
+  const s = SIGHTINGS[SIGHTINGS.length-1];
+  const mk = L.marker(ll,{icon:bubbleIcon(sp,false)});
+  mk.on('click',()=>openDetail(s));
+  markerLayer.addLayer(mk);
+}
+
+/* ============ 鸟讯详情 ============ */
+function openDetail(s){
+  const sp = s.sp ? byId[s.sp] : null;
+  const rare = spIsRare(sp);
+  let html = `<h2>${sp?sp.name:'❓ 未识别鸟'} `;
+  if(sp) html += `<span class="chip ${PROT[sp.prot][1]}">${PROT[sp.prot][0]}</span>`;
+  if(sp && sp.regionalRare) html += `<span class="chip gold">区域罕见</span>`;
+  if(spIsWish(sp)) html += `<span class="chip gold">⭐ 心愿鸟</span>`;
+  if(sp && sp.prot===0 && sp.rarity==='rare') html += `<span class="chip gold">区域罕见</span>`;
+  if(!sp) html += `<span class="chip purple">待鉴定</span>`;
+  html += `</h2>`;
+  html += `<div class="meta">${fmtMin(s.min)} · 距你约 ${distText()} · 数量 ${s.count} 只 · 上报者：${s.reporter}</div>`;
+  if(s.unknown) html += `<div class="desc">📝 上报者描述：「${s.unknown}」</div>`;
+  if(rare){
+    html += `<div class="photo-card"><div class="ph">${sp.emoji}</div><div class="src">${s.userPhoto?'📸 用户实拍照片':'🖼️ 图库照片'}（演示占位图，正式版为真实照片）</div></div>`;
+    html += `<div class="desc">🔥 <b>罕见鸟现身！</b>${sp.prot===2?'国家二级保护动物':sp.regionalRare?'该鸟在北京极少出现':'本地罕见记录'}。看到就是赚到，快去围观～（请保持距离、不诱拍）</div>`;
+  }
+  if(sp) html += `<div class="desc">${sp.desc}</div>`;
+  html += `<div class="row-btns">`;
+  html += `<button class="pill-btn" onclick="likeSighting(${s.id})">❤️ 围观 ${s.likes}</button>`;
+  html += `<button class="pill-btn" onclick="checkSighting(${s.id})">✅ 打卡 ${s.checks}</button>`;
+  html += `<button class="pill-btn" onclick="thanks(${s.reporter})">🙏 感谢</button>`;
+  html += `<button class="pill-btn" onclick="closeSheet();openCompose(sightingPostTemplate(${s.id}))">💬 发帖讨论</button>`;
+  if(sp) html += `<button class="pill-btn" onclick="goIdentify()">🔍 怎么认它？</button>`;
+  html += `</div>`;
+  if(s.comments.length){
+    html += `<div class="comments">${s.comments.map(c=>`<div class="c"><b>${c.u}</b>：${c.t}</div>`).join('')}</div>`;
+  } else {
+    html += `<div class="comments"><div class="c" style="color:var(--muted)">还没有留言，来抢沙发～</div></div>`;
+  }
+  $('sheet').innerHTML = html;
+  $('sheet').classList.add('show');
+  $('sheet-mask').classList.add('show');
+  // 强提醒横幅模拟（罕见鸟 或 心愿鸟）
+  if(sp && (rare || spIsWish(sp)) && (settings.t1||settings.t3)){
+    const kind = spIsWish(sp) ? `你的心愿鸟「${sp.name}」` : `罕见鸟「${sp.name}」`;
+    const b = $('push-banner');
+    b.innerHTML = `🔔 <b>强提醒</b>（模拟推送）：${kind} 于 ${fmtMin(s.min)} 出现在你附近 3km 内`;
+    b.style.display='block';
+    setTimeout(()=>{ if(b.style.display==='block') b.style.display='none'; }, 6000);
+  }
+}
+function closeSheet(){ $('sheet').classList.remove('show'); $('sheet-mask').classList.remove('show'); }
+function likeSighting(id){ const s=SIGHTINGS.find(x=>x.id===id); s.likes++; toast('围观 +1，感谢关注这个鸟讯！'); openDetail(s); }
+function checkSighting(id){ const s=SIGHTINGS.find(x=>x.id===id); s.checks++; myStats.checks++; toast('打卡成功！我到了，看到它了 🎉'); renderProfile(); openDetail(s); }
+function thanks(name){ toast(`已感谢「${name}」的分享 🙏`); }
+
+/* ============ 上报 + 国一拦截 ============ */
+let reportSel = null;
+function openReport(){
+  reportSel = null;
+  $('report-modal').innerHTML = `
+    <h2>＋ 上报鸟讯</h2>
+    <p style="font-size:12.5px;color:var(--muted)">你看到的鸟会被展示给周边鸟友，24 小时后自动消失。</p>
+    <div class="label">鸟种（搜索选择）</div>
+    <input type="text" id="rp-q" placeholder="输入鸟名，如：喜鹊 / 金雕" oninput="reportSearch(this.value)">
+    <div class="search-results" id="rp-res"></div>
+    <div id="rp-sel"></div>
+    <div id="rp-more" style="display:none">
+      <div class="label">数量</div>
+      <div class="stepper"><button onclick="rpCount(-1)">−</button><span id="rp-count">1</span><button onclick="rpCount(1)">＋</button></div>
+      <div class="label">备注（可选）</div>
+      <input type="text" id="rp-note" placeholder="比如：在芦苇丛边看到">
+      <div class="label">照片（可选）</div>
+      <input type="text" disabled value="演示版不传照片（正式版优先展示你的实拍）">
+      <div class="row-btns" style="margin-top:16px">
+        <button class="pill-btn primary" onclick="submitReport()">提交上报</button>
+      </div>
+    </div>`;
+  $('report-mask').classList.add('show');
+}
+function closeReport(){ $('report-mask').classList.remove('show'); }
+function reportSearch(q){
+  const box = $('rp-res');
+  if(!q.trim()){ box.innerHTML=''; return; }
+  const hits = SPECIES.filter(s=>s.name.includes(q.trim())).slice(0,8);
+  box.innerHTML = hits.map(s=>`
+    <div class="sr-item" onclick="pickReport(${s.id})">${s.emoji} ${s.name} <span class="chip ${PROT[s.prot][1]}">${PROT[s.prot][0]}</span><span style="color:var(--muted);font-size:12px">${SIZES[s.size]}</span></div>
+  `).join('') || '<div class="sr-item" style="color:var(--muted)">没有找到，试试其他写法（演示库仅 33 种）</div>';
+}
+function pickReport(id){
+  reportSel = byId[id];
+  $('rp-sel').innerHTML = `<div class="sr-item" style="background:var(--green-light);margin-top:8px">已选：<b>${reportSel.name}</b> <span class="chip ${PROT[reportSel.prot][1]}">${PROT[reportSel.prot][0]}</span></div>`;
+  $('rp-more').style.display='block';
+}
+let rpN = 1;
+function rpCount(d){ rpN = Math.max(1, rpN+d); $('rp-count').textContent = rpN; }
+function submitReport(){
+  if(!reportSel){ toast('请先搜索并选择鸟种'); return; }
+  if(reportSel.prot === 1){
+    // L1 禁报清单：国一隐藏，提交时拦截并告知原因
+    $('block-modal').innerHTML = `
+      <div class="warn-icon">🛑</div>
+      <h2 style="text-align:center">无法上报：${reportSel.name}</h2>
+      <p style="margin:10px 0">「${reportSel.name}」为<b style="color:var(--danger)">国家一级保护动物</b>，在<b>禁报清单</b>中。</p>
+      <p>因保护因素，该鸟种<b>不公开任何出现信息</b>。看到它，请为它保密——不公开精确位置、不追逐、不诱拍。</p>
+      <div class="row-btns" style="justify-content:center;margin-top:16px">
+        <button class="pill-btn danger" onclick="document.getElementById('block-mask').classList.remove('show');closeReport()">知道了</button>
+      </div>`;
+    $('block-mask').classList.add('show');
+    return;
+  }
+  closeReport();
+  myStats.reports++;
+  renderProfile();
+  addSightingMarker(reportSel);
+  if(spIsRare(reportSel)) toast('已上报！罕见鸟将触发周边鸟友强提醒 🔥');
+  else toast('已上报！周边鸟友将在 24 小时内看到这个气泡 🎉');
+  switchTab('tab-map');
+}
+
+/* ============ 识鸟 ============ */
+const QUESTIONS = [
+ {key:'prov',type:'chips',label:'你在哪里看到的？',opts:['北京','青海']},
+ {key:'month',type:'chips',label:'什么月份看到的？',opts:['1-3月','4-6月','7-9月','10-12月']},
+ {key:'env',type:'icon',label:'在什么环境看到的？',opts:ENVS},
+ {key:'size',type:'icon',label:'它有多大？',opts:Object.values(SIZES)},
+ {key:'group',type:'icon',label:'长得像哪一类？',opts:Object.values(GROUPS)},
+ {key:'face',type:'swatch',label:'头脸是什么颜色？',opts:COLORS},
+ {key:'wing',type:'swatch',label:'翅膀是什么颜色？',opts:COLORS},
+ {key:'belly',type:'swatch',label:'胸腹是什么颜色？',opts:COLORS},
+ {key:'beak',type:'icon',label:'嘴长什么样？',opts:Object.values(BEAKS)},
+ {key:'tail',type:'chips',label:'尾巴多长？',opts:TAILS},
+ {key:'tailShape',type:'icon',label:'尾巴什么形状？',opts:TAILSHAPES},
+ {key:'marks',type:'icon',label:'有没有这些特征？（可多选）',opts:MARKS}
+];
+const SIZES_REV = Object.fromEntries(Object.entries(SIZES).map(([k,v])=>[v,k]));
+const GROUPS_REV = Object.fromEntries(Object.entries(GROUPS).map(([k,v])=>[v,k]));
+const BEAKS_REV = Object.fromEntries(Object.entries(BEAKS).map(([k,v])=>[v,k]));
+let answers = {prov:'北京', month:'7-9月'};
+let qIdx = 0;
+
+function monthOk(sp, m){
+  if(m==='1-3月') return sp.season==='R'||sp.season==='W';
+  if(m==='4-6月') return sp.season==='R'||sp.season==='S';
+  if(m==='7-9月') return sp.season==='R'||sp.season==='S';
+  return sp.season==='R'||sp.season==='W';
+}
+function getPool(){
+  let pool = SPECIES.filter(s=>s.prov.includes(answers.prov));
+  if(answers.month) pool = pool.filter(s=>monthOk(s,answers.month));
+  return pool;
+}
+function scoreSp(sp){
+  let score=0, matched=[], missed=[];
+  const fields = [
+    ['env',sp.env,'环境'],['size',SIZES[sp.size],'大小'],['group',GROUPS[sp.group],'长相'],
+    ['face',sp.face,'头脸'],['wing',sp.wing,'翅膀'],['belly',sp.belly,'胸腹'],
+    ['beak',BEAKS[sp.beak],'嘴'],['tail',sp.tail,'尾巴'],['tailShape',sp.tailShape,'尾形']
+  ];
+  fields.forEach(([key,val,label])=>{
+    if(answers[key]===undefined) return;
+    if(val===answers[key]){ score+=2; matched.push(`${label}：${answers[key]}`); }
+    else { score-=2; missed.push(`${label}：${answers[key]}`); }
+  });
+  if(answers.marks && answers.marks.length){
+    const has = answers.marks.some(m=>sp.marks.includes(m));
+    if(has){ score+=2; matched.push(`特征：${answers.marks.filter(m=>sp.marks.includes(m)).join('、')}`); }
+    else { score-=2; missed.push(`特征：${answers.marks.join('、')}`); }
+  }
+  return {score,matched,missed};
+}
+function optIcon(key, opt){
+  if(key==='size') return `<span class="ic" style="font-size:${SIZE_PX[SIZES_REV[opt]]}px">${SIZE_ICONS[SIZES_REV[opt]]}</span>`;
+  if(key==='group') return `<span class="ic">${GROUP_ICONS[GROUPS_REV[opt]]}</span>`;
+  if(key==='beak') return `<span class="ic">${BEAK_SVG[BEAKS_REV[opt]]}</span>`;
+  if(key==='tailShape') return `<span class="ic">${TAIL_SVG[opt]}</span>`;
+  if(key==='env') return `<span class="ic">${ENV_ICONS[opt]}</span>`;
+  if(key==='marks') return `<span class="ic">${MARK_ICONS[opt]}</span>`;
+  return `<span class="ic">${opt}</span>`;
+}
+function renderQ(){
+  const q = QUESTIONS[qIdx];
+  $('q-idx').textContent = `第 ${qIdx+1} / ${QUESTIONS.length} 题`;
+  $('q-cand').textContent = `候选中 ${getPool().length} 种`;
+  $('q-title').textContent = q.label;
+  const cur = answers[q.key];
+  let html = '';
+  if(q.type==='swatch'){
+    html = `<div class="swatches">`+q.opts.map(c=>`
+      <div style="text-align:center"><div class="swatch ${cur===c?'sel':''}" style="background:${SWATCH_COLORS[c]}" onclick="answer('${q.key}','${c}')"><span class="lbl">${c}</span></div></div>
+    `).join('')+`</div><div style="height:20px"></div>`;
+  } else if(q.type==='icon'){
+    html = `<div class="opt-grid">`+q.opts.map(o=>{
+      const isSel = q.key==='marks' ? (cur&&cur.includes(o)) : (cur===o);
+      const fn = q.key==='marks' ? `answerMulti('${q.key}','${o}')` : `answer('${q.key}','${o.replace(/'/g,"")}')`;
+      return `<div class="opt-card ${isSel?'sel':''}" onclick="${fn}">${optIcon(q.key,o)}<div class="lb">${o}</div></div>`;
+    }).join('')+`</div>`;
+  } else {
+    html = `<div class="opt-chips">`+q.opts.map(o=>`
+      <button class="opt-chip ${cur===o?'sel':''}" onclick="answer('${q.key}','${o.replace(/'/g,"")}')">${o}</button>
+    `).join('')+`</div>`;
+  }
+  $('q-body').innerHTML = html;
+  $('q-prev').style.visibility = qIdx===0 ? 'hidden' : 'visible';
+}
+function answer(key,val){
+  answers[key] = answers[key]===val ? undefined : val;
+  if(qIdx<QUESTIONS.length-1){ qIdx++; renderQ(); } else checkAutoResult();
+}
+function answerMulti(key,val){
+  answers[key] = answers[key]||[];
+  const i = answers[key].indexOf(val);
+  if(i>=0) answers[key].splice(i,1); else answers[key].push(val);
+  renderQ();
+}
+function skipQ(){ if(qIdx<QUESTIONS.length-1){ qIdx++; renderQ(); } else checkAutoResult(); }
+function prevQ(){ if(qIdx>0){ qIdx--; renderQ(); } }
+function resetIdentify(){ answers={prov:'北京',month:'7-9月'}; qIdx=0; renderQ(); $('res-area').innerHTML=''; }
+function checkAutoResult(){
+  const pool = getPool();
+  const answered = Object.values(answers).filter(v=>v!==undefined&&(!Array.isArray(v)||v.length)).length;
+  if(pool.length<=6 && answered>=4) showResults();
+}
+let lastResults = [];
+function showResults(){
+  const pool = getPool();
+  const scored = pool.map(sp=>({sp, ...scoreSp(sp)})).sort((a,b)=>b.score-a.score);
+  const top = scored.filter(x=>x.score>0).slice(0,5);
+  lastResults = top.map(x=>x.sp);
+  let html = `<div class="card"><h3 style="font-size:15px">🔍 识别结果</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:6px">系统检索了 ${SPECIES.length} 种鸟（演示库），结合你的描述，为你找到 Top ${top.length}：</p></div>`;
+  if(!top.length){
+    html += `<div class="card" style="text-align:center;color:var(--muted)"><p>描述太少或互相矛盾，建议再回答几题，或发帖求助：</p>
+      <div class="row-btns" style="justify-content:center;margin-top:10px">
+      <button class="pill-btn primary" onclick="openCompose(identifyPostTemplate())">🙋 发到社区求助鉴定</button></div></div>`;
+  } else {
+    top.forEach(({sp,score,matched,missed})=>{
+      const [ptxt,pcls]=PROT[sp.prot];
+      html += `<div class="card res-item">
+        <h3>${sp.emoji} ${sp.name} <span class="chip ${pcls}">${ptxt}</span>${spIsRare(sp)?'<span class="chip gold">罕见</span>':''}<span style="float:right;font-size:12px;color:var(--muted)">匹配 ${score} 分</span></h3>
+        <div style="font-size:12px;color:var(--muted)">${SIZES[sp.size]} · ${GROUPS[sp.group]} · ${sp.season==='R'?'留鸟':sp.season==='S'?'夏候鸟':'冬候鸟'}</div>
+        <div class="pt-list">
+          ${matched.map(m=>`<div class="ok">✓ ${m}</div>`).join('')}
+          ${missed.slice(0,3).map(m=>`<div class="no">✗ ${m}</div>`).join('')}
+        </div>
+        <div style="font-size:12.5px;color:#42504a;margin-top:6px">${sp.desc}</div>
+        ${sp.similar.length?`<div style="font-size:12px;color:var(--muted);margin-top:6px">易混淆：${sp.similar.join('、')}（注意对比）</div>`:''}
+        <div class="row-btns" style="margin-top:10px">
+          <button class="pill-btn primary" onclick="confirmBird('${sp.name}')">✅ 确认是它</button>
+          <button class="pill-btn" onclick="openCompose(identifyPostTemplate())">🤔 还不确定</button>
+        </div>
+      </div>`;
+    });
+  }
+  html += `<div style="text-align:center;padding-bottom:16px"><button class="link-btn" onclick="resetIdentify()">↺ 重新识别</button></div>`;
+  $('res-area').innerHTML = html;
+  $('tab-identify').scrollTo({top:0,behavior:'smooth'});
+}
+function confirmBird(name){
+  if(!my.birds.includes(name)) my.birds.push(name);
+  renderProfile();
+  toast(`已记入「我的鸟种库」🎉 恭喜加新：${name}`);
+}
+function goIdentify(){ switchTab('tab-identify'); }
+
+/* ============ 社区（发帖/点赞/评论） ============ */
+function sightingPostTemplate(sid){
+  const s = SIGHTINGS.find(x=>x.id===sid);
+  const sp = s.sp ? byId[s.sp] : null;
+  if(!sp) return {cat:'求助鉴定', body:`我在附近看到一只不认识的小鸟，描述：「${s.unknown||''}」。大家帮我看看是什么鸟？`};
+  return {cat:'鸟讯讨论', body:`刚在附近看到【${sp.name}】${spIsRare(sp)?'（罕见鸟！）':''}，${s.count}只，有鸟友一起蹲吗？坐标见鸟讯。`};
+}
+function identifyPostTemplate(){
+  const pool = getPool();
+  const desc = [];
+  ['size','group','face','wing','belly','beak','tail','tailShape'].forEach(k=>{
+    if(answers[k]!==undefined) desc.push(answers[k]);
+  });
+  if(answers.marks && answers.marks.length) desc.push(...answers.marks);
+  const cand = lastResults.length ? ` 候选：${lastResults.slice(0,3).map(s=>s.name).join('、')}。` : '';
+  return {cat:'求助鉴定', body:`求助鉴定：今天在${answers.prov||'北京'}看到一只鸟，${desc.length?desc.join('、'):'（描述补充中）'}。${cand}请大家帮忙看看！`};
+}
+function openCompose(tpl){
+  const t = tpl || {cat:'自由分享', body:''};
+  $('compose-modal').innerHTML = `
+    <h2>✍️ 发帖</h2>
+    <p style="font-size:12px;color:var(--muted)">已按场景生成模板，你可以随意修改</p>
+    <div class="label">话题</div>
+    <div class="opt-chips" id="cp-cats">
+      ${['求助鉴定','鸟讯讨论','新手交流','自由分享'].map(c=>`<button class="opt-chip ${c===t.cat?'sel':''}" onclick="pickCat('${c}')">${c}</button>`).join('')}
+    </div>
+    <div class="label">内容</div>
+    <textarea id="cp-body">${t.body}</textarea>
+    <div class="row-btns" style="margin-top:14px">
+      <button class="pill-btn primary" onclick="publishPost()">发布</button>
+      <button class="pill-btn" onclick="closeCompose()">取消</button>
+    </div>`;
+  $('compose-mask').classList.add('show');
+}
+let cpCat = '自由分享';
+function pickCat(c){ cpCat = c; document.querySelectorAll('#cp-cats .opt-chip').forEach(b=>b.classList.toggle('sel', b.textContent===c)); }
+function closeCompose(){ $('compose-mask').classList.remove('show'); }
+function publishPost(){
+  const body = $('cp-body').value.trim();
+  if(!body){ toast('写点什么再发布吧'); return; }
+  POSTS.unshift({id:Date.now(),cat:cpCat,author:my.nickname,avatar:my.avatar,minAgo:0,body,emoji:cpCat==='求助鉴定'?'❓':cpCat==='鸟讯讨论'?'🗺️':cpCat==='新手交流'?'🙋':'🐦',likes:0,liked:false,comments:[]});
+  closeCompose();
+  cpCat='自由分享';
+  renderPosts();
+  toast('发布成功！社区鸟友可以看到你的帖子了 🎉');
+}
+function renderPosts(){
+  $('post-list').innerHTML = POSTS.map(p=>`
+    <div class="post">
+      <div class="p-head">
+        <div class="ava">${p.avatar}</div>
+        <div style="flex:1">
+          <div class="p-name">${p.author} <span class="chip ${p.cat==='求助鉴定'?'purple':p.cat==='鸟讯讨论'?'orange':'green'}">${p.cat}</span></div>
+          <div class="p-time">${fmtMin(p.minAgo)}</div>
+        </div>
+      </div>
+      <div class="p-body">${p.body}<span style="font-size:36px;display:block;margin-top:4px">${p.emoji}</span></div>
+      <div class="p-acts">
+        <span class="${p.liked?'liked':''}" onclick="likePost(${p.id})">${p.liked?'❤️':'🤍'} ${p.likes}</span>
+        <span onclick="togglePostComments(${p.id})">💬 ${p.comments.length} 条评论</span>
+      </div>
+      <div class="p-comments" id="pc-${p.id}">
+        ${p.comments.map(c=>`<div class="c"><b>${c.u}</b>：${c.t}</div>`).join('')||'<div class="c" style="color:var(--muted)">还没有评论</div>'}
+        <div class="comment-input">
+          <input type="text" id="pc-input-${p.id}" placeholder="友善发言…" onkeydown="if(event.key==='Enter')commentPost(${p.id})">
+          <button class="pill-btn primary" style="padding:7px 13px" onclick="commentPost(${p.id})">发送</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+function likePost(id){ const p=POSTS.find(x=>x.id===id); p.liked=!p.liked; p.likes+=p.liked?1:-1; renderPosts(); }
+function togglePostComments(id){ const el=$('pc-'+id); if(el) el.classList.toggle('show'); }
+function commentPost(id){
+  const inp=$('pc-input-'+id); const txt=inp.value.trim();
+  if(!txt){ toast('写点什么吧'); return; }
+  const p=POSTS.find(x=>x.id===id);
+  p.comments.push({u:my.nickname,t:txt});
+  inp.value='';
+  renderPosts();
+  const el=$('pc-'+id); if(el) el.classList.add('show');
+  toast('评论成功 💬');
+}
+
+/* ============ 本地鸟种手册 ============ */
+let hbRegion='全市', hbFilter='all';
+function renderHandbook(){
+  const list = HANDBOOK.filter(h=>{
+    if(hbFilter==='common') return !byName[h.name] || byName[h.name].rarity==='common';
+    if(hbFilter==='rare') return byName[h.name] && (byName[h.name].prot>0 || byName[h.name].rarity==='rare' || byName[h.name].regionalRare);
+    if(hbFilter==='ebird') return h.source==='ebird';
+    return true;
+  });
+  $('hb-list').innerHTML = hbRegion==='全市' ? list.map(h=>{
+    const sp = byName[h.name];
+    const [ptxt,pcls] = sp ? PROT[sp.prot] : ['','gray'];
+    return `<div class="card" style="margin:10px 12px"><div class="hb-item" style="border:none;padding:0">
+      <div class="l"><span style="font-size:20px">${sp?sp.emoji:'🐦'}</span> <div><b>${h.name}</b> ${ptxt?`<span class="chip ${pcls}">${ptxt}</span>`:''}${sp&&sp.regionalRare?'<span class="chip gold">区域罕见</span>':''}<div style="font-size:11px;color:var(--muted)">${sp?(sp.rarity==='common'?'常见':'不常见'):''}</div></div></div>
+      <div class="r">近30天 <b>${h.count}</b> 次<br>${h.place} · ${h.daysAgo===0?'今天':h.daysAgo+'天前'}<br><span class="chip ${h.source==='ebird'?'purple':'green'}" style="margin-top:3px">${h.source==='ebird'?'eBird 参考':'平台记录'}</span></div>
+    </div></div>`;
+  }).join('') : `<div class="card" style="text-align:center;color:var(--muted);padding:30px 16px">📖 演示数据仅覆盖"北京·全市"<br>正式版可按区/市切换（基于行政区划聚合）</div>`;
+}
+document.querySelectorAll('[data-hb]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('[data-hb]').forEach(x=>x.classList.remove('sel')); b.classList.add('sel');
+  hbRegion=b.dataset.hb; renderHandbook();
+});
+document.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('[data-f]').forEach(x=>x.classList.remove('sel')); b.classList.add('sel');
+  hbFilter=b.dataset.f; renderHandbook();
+});
+const HANDBOOK = [
+ {name:'麻雀',count:128,place:'奥森公园',daysAgo:0,source:'platform'},{name:'喜鹊',count:102,place:'奥森公园',daysAgo:0,source:'platform'},
+ {name:'灰喜鹊',count:88,place:'圆明园',daysAgo:1,source:'platform'},{name:'白头鹎',count:76,place:'朝阳公园',daysAgo:0,source:'platform'},
+ {name:'珠颈斑鸠',count:64,place:'奥森公园',daysAgo:1,source:'platform'},{name:'绿头鸭',count:58,place:'奥森南园湿地',daysAgo:0,source:'platform'},
+ {name:'乌鸫',count:47,place:'颐和园',daysAgo:2,source:'platform'},{name:'夜鹭',count:39,place:'什刹海',daysAgo:1,source:'platform'},
+ {name:'大山雀',count:31,place:'植物园',daysAgo:3,source:'platform'},{name:'戴胜',count:24,place:'奥森公园',daysAgo:2,source:'platform'},
+ {name:'小䴙䴘',count:22,place:'圆明园',daysAgo:1,source:'platform'},{name:'普通翠鸟',count:18,place:'奥森南园湿地',daysAgo:2,source:'platform'},
+ {name:'黑水鸡',count:16,place:'玉渊潭',daysAgo:3,source:'platform'},{name:'鸳鸯',count:13,place:'北海公园',daysAgo:2,source:'platform'},
+ {name:'大斑啄木鸟',count:12,place:'奥森公园',daysAgo:1,source:'platform'},{name:'银喉长尾山雀',count:9,place:'植物园',daysAgo:4,source:'ebird'},
+ {name:'红嘴蓝鹊',count:8,place:'香山',daysAgo:3,source:'ebird'},{name:'凤头䴙䴘',count:6,place:'奥森南园湿地',daysAgo:5,source:'ebird'},
+ {name:'白鹭',count:15,place:'凉水河',daysAgo:1,source:'platform'},{name:'红喉歌鸲',count:2,place:'奥森公园',daysAgo:6,source:'ebird'},
+ {name:'宝兴歌鸲',count:1,place:'奥森北园',daysAgo:0,source:'platform'},{name:'灰鹤',count:3,place:'野鸭湖',daysAgo:4,source:'ebird'}
+];
+
+/* ============ 我的 ============ */
+function renderProfile(){
+  $('my-ava').textContent = my.avatar;
+  $('my-name').textContent = my.nickname;
+  $('stat-reports').textContent = myStats.reports;
+  $('stat-checks').textContent = myStats.checks;
+  $('stat-birds').textContent = my.birds.length;
+  $('stat-likes').textContent = myStats.likes;
+  $('wish-count').textContent = settings.wishes.length;
+  $('wish-chips').innerHTML = settings.wishes.map(w=>{
+    const sp = byName[w];
+    return `<button class="sel" onclick="removeWish('${w}')">${sp?sp.emoji:'🐦'} ${w} ✕</button>`;
+  }).join('') || `<div class="empty-hint" style="padding:4px 0 0;text-align:left">还没有心愿鸟。点下方按钮，搜索你想见到的鸟～</div>`;
+  $('my-birds').innerHTML = my.birds.length ? my.birds.map((b,i)=>{
+    const sp = byName[b];
+    return `<div class="bird-row"><span>${sp?sp.emoji:'🐦'} ${b}</span><button class="link-btn" onclick="my.birds.splice(${i},1);renderProfile()">移除</button></div>`;
+  }).join('') : '<div class="empty-hint">还没有记录。去"识鸟"确认你的第一只鸟吧 🐣</div>';
+}
+function openAvatarPick(){
+  $('avatar-modal').innerHTML = `
+    <h2>选择头像</h2>
+    <div class="avatar-pick">${['🐣','🐦','🦉','🦜','🦆','🦅','📷','🌿'].map(a=>`
+      <button class="${my.avatar===a?'sel':''}" onclick="my.avatar='${a}';renderProfile();document.getElementById('avatar-mask').classList.remove('show');toast('头像已更新')">${a}</button>`).join('')}</div>
+    <div class="label">昵称</div>
+    <input type="text" id="nk-input" value="${my.nickname}" maxlength="12">
+    <div class="row-btns" style="margin-top:14px"><button class="pill-btn primary" onclick="my.nickname=document.getElementById('nk-input').value.trim()||my.nickname;renderProfile();document.getElementById('avatar-mask').classList.remove('show');toast('资料已保存')">保存</button></div>`;
+  $('avatar-mask').classList.add('show');
+}
+
+/* ============ 提醒设置 ============ */
+function openSettings(){
+  $('settings-modal').innerHTML = `
+    <h2>🔔 提醒设置</h2>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:6px">只有"罕见/重要"的鸟才会打扰你，常见鸟不推送。</p>
+    <div class="switch-row"><div class="s-label">罕见鸟（国家二级 + 区域罕见）<small>如鸳鸯、灰鹤、宝兴歌鸲</small></div><div class="switch ${settings.t1?'on':''}" onclick="toggleS('t1',this)"></div></div>
+    <div class="switch-row"><div class="s-label">区域罕见鸟<small>本地极少出现的鸟，出现即推</small></div><div class="switch ${settings.t2?'on':''}" onclick="toggleS('t2',this)"></div></div>
+    <div class="switch-row"><div class="s-label">我的心愿鸟<small>标记为目标，一出现就强提醒</small></div><div class="switch ${settings.t3?'on':''}" onclick="toggleS('t3',this)"></div></div>
+    <div class="label">心愿鸟管理</div>
+    <button class="pill-btn" style="width:100%" onclick="closeSettings();switchTab('tab-profile')">去「我的」页搜索添加心愿鸟 →</button>
+    <div class="row-btns" style="justify-content:center;margin-top:16px">
+      <button class="pill-btn primary" onclick="closeSettings();renderProfile();toast('提醒设置已保存 ✅（正式版将绑定微信订阅消息）')">保存</button>
+    </div>`;
+  $('settings-mask').classList.add('show');
+}
+function closeSettings(){ $('settings-mask').classList.remove('show'); }
+function toggleS(key,el){ settings[key]=!settings[key]; el.classList.toggle('on',settings[key]); }
+function removeWish(name){
+  settings.wishes = settings.wishes.filter(w=>w!==name);
+  renderProfile();
+  if(map) renderSightings();
+  toast(`已移除心愿鸟「${name}」`);
+}
+function openWishSearch(){
+  $('wish-modal').innerHTML = `
+    <h2>⭐ 添加心愿鸟</h2>
+    <p style="font-size:12px;color:var(--muted)">搜索鸟名添加，最多 5 种（当前 <span id="ws-count">${settings.wishes.length}</span>/5）</p>
+    <input type="text" id="ws-q" placeholder="输入鸟名，如：灰鹤 / 宝兴歌鸲" oninput="wishSearch(this.value)" style="margin-top:8px" autocomplete="off">
+    <div id="ws-hint" style="font-size:12px;color:var(--muted);margin:10px 0 4px">不搜索时推荐这些（罕见/保护鸟，心愿鸟首选）：</div>
+    <div class="search-results" id="ws-res" style="max-height:300px"></div>
+    <div style="margin-top:12px;text-align:center"><button class="pill-btn primary" onclick="document.getElementById('wish-mask').classList.remove('show')">完成</button></div>`;
+  $('wish-mask').classList.add('show');
+  wishSearch('');
+  setTimeout(()=>{ const inp=$('ws-q'); if(inp) inp.focus(); }, 100);
+}
+function wishSearch(q){
+  const qq = (q||'').replace(/'/g,"").trim();
+  const box = $('ws-res');
+  const hint = $('ws-hint');
+  let list;
+  if(qq){
+    hint.style.display='none';
+    list = SPECIES.filter(s=>s.name.includes(qq));
+  } else {
+    hint.style.display='block';
+    list = SPECIES.filter(s=>s.prot>=1 || s.regionalRare || s.rarity==='rare').slice(0,10);
+  }
+  box.innerHTML = list.map(s=>{
+    const added = settings.wishes.includes(s.name);
+    const full = settings.wishes.length>=5 && !added;
+    return `<div class="sr-item">
+      <span style="font-size:20px">${s.emoji}</span>
+      <div style="flex:1"><b>${s.name}</b> <span class="chip ${PROT[s.prot][1]}">${PROT[s.prot][0]}</span>${s.regionalRare?'<span class="chip gold">区域罕见</span>':''}</div>
+      ${added
+        ? `<button class="pill-btn" style="padding:4px 10px;font-size:12px" onclick="removeWish('${s.name}');wishSearch('${qq}')">已添加 ✕</button>`
+        : `<button class="pill-btn primary" style="padding:4px 10px;font-size:12px" ${full?'disabled':''} onclick="addWish('${s.name}');wishSearch('${qq}')">＋ 添加</button>`}
+    </div>`;
+  }).join('') || '<div class="sr-item" style="color:var(--muted)">没有找到，换个写法试试（演示库仅 33 种）</div>';
+  const c = $('ws-count'); if(c) c.textContent = settings.wishes.length;
+}
+function addWish(name){
+  if(settings.wishes.length>=5){ toast('最多选 5 种心愿鸟'); return; }
+  if(settings.wishes.includes(name)) return;
+  settings.wishes.push(name);
+  renderProfile();
+  if(map) renderSightings();
+  toast(`已添加心愿鸟「${name}」⭐ 它一出现就强提醒你`);
+}
+
+/* ============ 演示说明 ============ */
+function openDemoNote(){
+  $('note-modal').innerHTML = `
+    <h2>🐦 体验说明</h2>
+    <p style="font-size:13px">
+    · 浏览器体验版，内置演示数据（33 种鸟、15 条鸟讯、22 条手册记录）<br><br>
+    · <b>地图</b>：绿气泡=常见鸟（随机展示，点"换一批"刷新）；橙框大圆=罕见鸟照片气泡（点开看照片卡）；金色星=心愿鸟；紫"?"=待鉴定<br>
+    · <b>罕见判定</b> = 保护等级 + 当地出现数量：宝兴歌鸲没有保护等级但北京极罕见 → 照片气泡+强提醒<br>
+    · 上报"金雕/黑颈鹤/黄胸鹀"等<b>国一</b>：提交时拦截并告知原因（国一隐藏，不产生任何鸟讯）<br>
+    · <b>识鸟</b>：喙型/尾形有简笔画示意图，大小按比例示意；候选 ≤6 自动出结果；"还不确定"→ 直接生成求助鉴定帖<br>
+    · <b>社区</b>：发帖/点赞/评论全流程可用；鸟讯详情和识鸟结果都有"发帖"按钮，自动生成模板（可改）<br>
+    · <b>我的</b>：改昵称/头像、设心愿鸟（醒目金色卡片，搜索添加、最多 5 种）、我的鸟种库<br><br>
+    产品名"等鸟"（暂定）。
+    </p>
+    <div class="row-btns" style="justify-content:center"><button class="pill-btn primary" onclick="document.getElementById('note-mask').classList.remove('show')">开始体验</button></div>`;
+  $('note-mask').classList.add('show');
+}
+
+/* ============ 启动 ============ */
+initMap();
+renderQ();
+renderPosts();
+renderHandbook();
+renderProfile();
+</script>
+</body>
+</html>
