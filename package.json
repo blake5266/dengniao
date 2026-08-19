@@ -1,0 +1,7 @@
+{
+  "name": "dengniao",
+  "private": true,
+  "scripts": {
+    "build": "exit 0"
+  }
+}
