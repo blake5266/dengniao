@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>等鸟 · 观鸟社区 Demo v3</title>
+<title>等鸟 · 观鸟社区 Demo v4</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
@@ -124,9 +124,19 @@ textarea { resize:none; min-height:110px; line-height:1.6; }
 .post .p-comments.show { display:block; }
 .post .p-comments .c { padding:3px 0; color:#42504a; }
 .post .p-comments .c b { color:var(--text); }
+/* v4 社区：筛选栏固定 + 发帖按钮悬浮不随滚动 */
+#tab-community { overflow:hidden; }
+#tab-community.active { display:flex; flex-direction:column; }
+#comm-filter { flex-shrink:0; background:#fff; border-bottom:1px solid #f0f2f0; padding:7px 12px 8px; z-index:10; }
+#comm-filter .f-row { display:flex; align-items:center; flex-wrap:wrap; gap:2px 8px; }
+#comm-filter .f-label { font-size:11px; color:var(--muted); flex-shrink:0; }
+#comm-filter .opt-chip { padding:4px 11px; font-size:12px; }
+.community-wrap { flex:1; min-height:0; overflow-y:auto; position:relative; }
 #compose-btn { position:absolute; right:14px; bottom:16px; background:var(--green); color:#fff; border:none; border-radius:999px; padding:12px 17px; font-size:13.5px; font-weight:600; box-shadow:0 4px 14px rgba(46,125,79,.45); cursor:pointer; z-index:600; }
-.community-wrap { position:relative; height:100%; }
 #post-list { padding-bottom:80px; }
+.img-rec-box { border:1.5px dashed #c9d6cd; border-radius:12px; padding:11px 12px; font-size:13px; cursor:pointer; text-align:center; margin:10px 0 2px; background:#fbfdfb; }
+.img-rec-box:hover { border-color:var(--green); background:var(--green-light); }
+.cmt-like { margin-left:6px; cursor:pointer; font-size:11.5px; color:var(--muted); white-space:nowrap; }
 
 /* profile */
 .profile-card { background:linear-gradient(135deg,var(--green),#4a9d6f); border-radius:14px; padding:18px; margin:12px; color:#fff; }
@@ -169,7 +179,7 @@ textarea { resize:none; min-height:110px; line-height:1.6; }
 <div id="phone">
   <header>
     <div>
-      <h1>等鸟<span style="font-size:11px;opacity:.8">（演示 v3）</span></h1>
+      <h1>等鸟<span style="font-size:11px;opacity:.8">（演示 v4）</span></h1>
       <div class="sub">🐦 新手观鸟社区 · 北京</div>
     </div>
     <div class="btns">
@@ -197,10 +207,35 @@ textarea { resize:none; min-height:110px; line-height:1.6; }
 
     <!-- 社区 -->
     <section class="tab" id="tab-community">
+      <div id="comm-filter">
+        <div class="f-row">
+          <span class="f-label">区域</span>
+          <div class="opt-chips" id="f-area">
+            <button class="opt-chip sel" data-a="all">全部</button>
+            <button class="opt-chip" data-a="海淀区">海淀区</button>
+            <button class="opt-chip" data-a="朝阳区">朝阳区</button>
+          </div>
+        </div>
+        <div class="f-row">
+          <span class="f-label">类型</span>
+          <div class="opt-chips" id="f-type">
+            <button class="opt-chip sel" data-t="all">全部</button>
+            <button class="opt-chip" data-t="鸟讯">鸟讯</button>
+            <button class="opt-chip" data-t="求鉴定">求鉴定</button>
+            <button class="opt-chip" data-t="讨论">讨论</button>
+            <button class="opt-chip" data-t="分享">分享</button>
+          </div>
+          <span class="f-label" style="margin-left:auto">排序</span>
+          <div class="opt-chips" id="f-sort">
+            <button class="opt-chip sel" data-s="hot">🔥 热度</button>
+            <button class="opt-chip" data-s="new">🕐 最新</button>
+          </div>
+        </div>
+      </div>
       <div class="community-wrap">
         <div id="post-list"></div>
-        <button id="compose-btn" onclick="openCompose()">✍️ 发帖</button>
       </div>
+      <button id="compose-btn" onclick="openCompose()">✍️ 发帖</button>
     </section>
 
     <!-- 本地鸟种手册 -->
@@ -416,19 +451,37 @@ const SIGHTINGS = [
  {id:16,sp:5,min:30,lat:39.9948,lng:116.3935,count:1,reporter:'观鸟小白',likes:2,checks:1,note:'小区楼下草坪',comments:[]}
 ];
 
-/* 社区帖子 */
+/* 社区帖子（鸟讯=帖子：带 sid 的帖子与鸟讯共享评论数组，围观/打卡渲染时实时读鸟讯） */
+const AVATARS = {'观鸟小白':'🐣','老法师':'📷','老鹰眼':'🦉','海淀观鸟人':'🔭','小麻雀酱':'🌸','木木':'🌿','咕咕咕':'🕊️','新手小圆':'🐥','匿名鸟友':'🐦','鸟友小北':'🐤','炮队队长':'📸'};
 let POSTS = [
- {id:1,cat:'求助鉴定',author:'新手小圆',avatar:'🐣',minAgo:52,body:'今天在奥森看到一只褐色小鸟，比麻雀大一点，头顶有点翘，尾巴一抖一抖的。大家帮我看看是什么鸟？',emoji:'❓',likes:4,liked:false,comments:[{u:'老鹰眼',t:'听描述像北红尾鸲，雄鸟头顶有白斑，尾羽橙红爱抖尾，可以对照一下'},{u:'新手小圆',t:'对对对！尾巴是橙红色的！谢谢大佬'}]},
- {id:2,cat:'鸟讯讨论',author:'老法师',avatar:'📷',minAgo:38,body:'【宝兴歌鸲】奥森北园！北京多年未见的区域罕见鸟，今天现身！提醒：请勿使用诱拍、播放录音，文明观鸟。',emoji:'🎵',likes:56,liked:false,comments:[{u:'炮队队长',t:'赶到！蹲到了，感恩'},{u:'观鸟小白',t:'请问要几点去比较好？'},{u:'老法师',t:'清晨和傍晚活动最活跃'}]},
- {id:3,cat:'新手交流',author:'观鸟小白',avatar:'🐣',minAgo:200,body:'新手求教：怎么区分喜鹊和灰喜鹊？感觉长得差不多，都是黑白长尾巴。',emoji:'🙋',likes:9,liked:false,comments:[{u:'海淀观鸟人',t:'看背色！灰喜鹊背是灰蓝色的，体型更小；喜鹊黑白分明带蓝绿光泽，而且体型大不少'}]},
- {id:4,cat:'自由分享',author:'小麻雀酱',avatar:'🌸',minAgo:1500,body:'今日份小确幸：翠鸟站在荷杆上，蓝得像宝石。附上我今天的记录～',emoji:'💎',likes:23,liked:false,comments:[{u:'木木',t:'哪里拍的？求位置'},{u:'小麻雀酱',t:'奥森南园湿地～'}]}
+ {id:1,cat:'求鉴定',sid:9,author:'新手小圆',avatar:'🐥',minAgo:52,area:'朝阳区',body:'今天在奥森看到一只褐色小鸟，比麻雀大一点，头顶有点翘，尾巴一抖一抖的。大家帮我看看是什么鸟？',emoji:'❓',likes:4,liked:false,comments:[{u:'老鹰眼',t:'听描述像北红尾鸲，雄鸟头顶有白斑，尾羽橙红爱抖尾，可以对照一下',l:3},{u:'新手小圆',t:'对对对！尾巴是橙红色的！谢谢大佬',l:1}]},
+ {id:2,cat:'鸟讯',sid:14,author:'老法师',avatar:'📷',minAgo:38,area:'朝阳区',body:'【宝兴歌鸲】奥森北园！北京多年未见的区域罕见鸟，今天现身！提醒：请勿使用诱拍、播放录音，文明观鸟。',emoji:'🎵',likes:56,liked:false,comments:[{u:'炮队队长',t:'赶到！蹲到了，感恩',l:5},{u:'观鸟小白',t:'请问要几点去比较好？',l:2},{u:'老法师',t:'清晨和傍晚活动最活跃',l:1}]},
+ {id:3,cat:'讨论',author:'观鸟小白',avatar:'🐣',minAgo:200,area:'海淀区',body:'新手求教：怎么区分喜鹊和灰喜鹊？感觉长得差不多，都是黑白长尾巴。',emoji:'🙋',likes:9,liked:false,comments:[{u:'海淀观鸟人',t:'看背色！灰喜鹊背是灰蓝色的，体型更小；喜鹊黑白分明带蓝绿光泽，而且体型大不少',l:4}]},
+ {id:4,cat:'分享',author:'小麻雀酱',avatar:'🌸',minAgo:1500,area:'朝阳区',body:'今日份小确幸：翠鸟站在荷杆上，蓝得像宝石。附上我今天的记录～',emoji:'💎',likes:23,liked:false,comments:[{u:'木木',t:'哪里拍的？求位置',l:2},{u:'小麻雀酱',t:'奥森南园湿地～',l:1}]}
 ];
+function areaOf(s){ return s.lng >= 116.3895 ? '朝阳区' : '海淀区'; }
+function autoPostFromSighting(s){
+  const sp = s.sp ? byId[s.sp] : null;
+  return {
+    id: Date.now() + Math.floor(Math.random()*1000),
+    sid: s.id, cat: sp?'鸟讯':'求鉴定',
+    author: s.reporter, avatar: AVATARS[s.reporter]||'🐦',
+    minAgo: s.min, area: areaOf(s),
+    body: sp ? `我在附近看到【${sp.name}】${s.count} 只${s.note?'（'+s.note+'）':''}，${spIsRare(sp)?'罕见鸟，看到的鸟友速来！':'同城鸟友快来蹲～'}` : `求助鉴定：${s.unknown}。请大家帮我看看是什么鸟？`,
+    emoji: sp?sp.emoji:'❓', likes:s.likes, liked:false,
+    comments:s.comments /* 与鸟讯共享同一数组，评论双向同步 */
+  };
+}
 
 /* 我的 */
 let my = {nickname:'观鸟小白', avatar:'🐣', birds:[]};
 let settings = {t1:true,t2:true,t3:true,wishes:['灰鹤','宝兴歌鸲']};
 let myStats = {reports:1, checks:2, likes:3};
 let myReports = [16]; // 我的上报记录（鸟讯 id）
+
+/* 鸟讯=帖子：绑定带 sid 的种子帖子（共享评论数组），并为没有帖子的 24h 内鸟讯自动建帖 */
+POSTS.forEach(p=>{ if(p.sid){ const s=SIGHTINGS.find(x=>x.id===p.sid); if(s) s.comments = p.comments; } });
+SIGHTINGS.filter(s=>s.min<=1440 && !POSTS.some(p=>p.sid===s.id)).forEach(s=>POSTS.push(autoPostFromSighting(s)));
 
 /* ============ 工具 ============ */
 const $ = id => document.getElementById(id);
@@ -483,6 +536,7 @@ function renderSightings(){
   markerLayer = L.layerGroup().addTo(map);
   SIGHTINGS.forEach(s=>{
     if(s.min>1440) return; // 24h 过期不显示
+    if(s.resolved) return; // 已解决：气泡从地图移除（帖子保留）
     const sp = s.sp ? byId[s.sp] : null;
     const ll = [s.lat,s.lng];
     // 常见鸟随机展示（太多的话刷屏）；罕见鸟/心愿鸟/待鉴定全部展示
@@ -510,6 +564,7 @@ function openDetail(s){
   if(spIsWish(sp)) html += `<span class="chip gold">⭐ 心愿鸟</span>`;
   if(sp && sp.prot===0 && sp.rarity==='rare') html += `<span class="chip gold">区域罕见</span>`;
   if(!sp) html += `<span class="chip purple">待鉴定</span>`;
+  if(s.resolved) html += `<span class="chip green">已解决</span>`;
   html += `</h2>`;
   html += `<div class="meta">${fmtMin(s.min)} · 距你约 ${distText()} · 数量 ${s.count} 只 · 上报者：${s.reporter}${s.note?` · 📝 ${esc(s.note)}`:''}</div>`;
   if(s.unknown) html += `<div class="desc">📝 上报者描述：「${esc(s.unknown)}」</div>`;
@@ -522,13 +577,16 @@ function openDetail(s){
   html += `<button class="pill-btn" onclick="likeSighting(${s.id})">❤️ 围观 ${s.likes}</button>`;
   html += `<button class="pill-btn" onclick="checkSighting(${s.id})">✅ 打卡 ${s.checks}</button>`;
   html += `<button class="pill-btn" onclick="thanks(${s.reporter})">🙏 感谢</button>`;
-  html += `<button class="pill-btn" onclick="closeSheet();openCompose(sightingPostTemplate(${s.id}))">💬 发帖讨论</button>`;
-  html += `</div>`;
-  if(s.comments.length){
-    html += `<div class="comments">${s.comments.map(c=>`<div class="c"><b>${c.u}</b>：${c.t}</div>`).join('')}</div>`;
-  } else {
-    html += `<div class="comments"><div class="c" style="color:var(--muted)">还没有留言，来抢沙发～</div></div>`;
+  if(!sp && s.reporter===my.nickname && !s.resolved){
+    html += `<button class="pill-btn" style="border-color:var(--green);color:var(--green)" onclick="resolveUnknown(${s.id})">✓ 已解决（我知道它是什么了）</button>`;
   }
+  html += `</div>`;
+  // 留言 = 社区帖子的评论（共享数组，按热度排序）
+  const hc = heatComments(s.comments);
+  html += `<div class="comments"><div style="font-size:11px;color:var(--muted);margin-bottom:4px">💬 留言（同步到社区帖子 · 按热度排序）</div>`;
+  html += hc.length ? hc.map((c,i)=>`<div class="c"><b>${c.u}</b>：${c.t}<span class="cmt-like" onclick="likeComment('s',${s.id},${i})">${c.l?'❤️ '+c.l:'🤍'}</span></div>`).join('') : `<div class="c" style="color:var(--muted)">还没有留言，来抢沙发～</div>`;
+  html += `</div>`;
+  html += `<div class="comment-input"><input id="sheet-cmt" placeholder="留言会同步到社区帖子…" onkeydown="if(event.key==='Enter')commentSighting(${s.id})"><button class="pill-btn primary" style="padding:7px 13px" onclick="commentSighting(${s.id})">发送</button></div>`;
   $('sheet').innerHTML = html;
   $('sheet').classList.add('show');
   $('sheet-mask').classList.add('show');
@@ -552,7 +610,8 @@ function openReport(){
   reportSel = null; reportPhoto = null; rpN = 1;
   $('report-modal').innerHTML = `
     <h2>＋ 上报鸟讯</h2>
-    <p style="font-size:12.5px;color:var(--muted)">拍到照片的鸟讯会经过懂鸟核验，更容易被周边鸟友看到；没拍到也可以直接报。24 小时后自动消失。</p>
+    <p style="font-size:12.5px;color:var(--muted)">拍到照片的鸟讯会经过懂鸟核验；没拍到也可以直接报。鸟讯 24 小时后自动消失。</p>
+    <div class="img-rec-box" onclick="openImgRec()">📷 拍到了鸟但不认识？<b style="color:var(--green)">用照片识别鸟种</b>（懂鸟识别 · 自动定种）</div>
     <div class="label">鸟种（搜索选择）</div>
     <input type="text" id="rp-q" placeholder="输入鸟名，如：喜鹊 / 金雕" oninput="reportSearch(this.value)">
     <div class="search-results" id="rp-res"></div>
@@ -562,9 +621,10 @@ function openReport(){
       <div class="stepper"><button onclick="rpCount(-1)">−</button><span id="rp-count">1</span><button onclick="rpCount(1)">＋</button></div>
       <div class="label">备注（可选）</div>
       <input type="text" id="rp-note" placeholder="比如：在芦苇丛边看到">
-      <div class="label">照片（可选 · 有照片会经过懂鸟核验）</div>
+      <div class="label">照片（可选）</div>
       <input type="file" id="rp-photo" accept="image/*" onchange="reportPhotoPicked(this)">
       <div class="up-file" id="rp-photo-name"></div>
+      <div class="up-file">📷 上传高清照片的鸟讯，有<b>更高概率</b>展示给周边鸟友</div>
       <div class="row-btns" style="margin-top:16px">
         <button class="pill-btn primary" onclick="submitReport()">提交上报</button>
       </div>
@@ -651,12 +711,15 @@ function publishReport(sp, opts){
   rpN = 1; pendingNote = ''; reportPhoto = null;
   const isNew = !my.birds.includes(sp.name);
   if(isNew) my.birds.push(sp.name);
+  POSTS.unshift(autoPostFromSighting(s)); // 鸟讯=帖子：强制自动发帖
+  renderPosts();
   renderProfile();
   addSightingMarker(s);
   switchTab('tab-map');
   if(spIsRare(sp)) toast('已上报！罕见鸟将触发周边鸟友强提醒 🔥'+(isNew?' 🎉 加新':''));
-  else if(opts.verified) toast('核验通过，已发布 ✅ 周边鸟友将很快看到'+(isNew?' 🎉 加新':''));
-  else toast('已发布（无照片，被看到的概率较低）🐦'+(isNew?' 🎉 加新':''));
+  else if(opts.rec) toast('识别成功 ✅ 已自动定种并核验发布'+(isNew?' 🎉 加新':''));
+  else if(opts.verified) toast('核验通过，已发布 ✅ 高清照片的鸟讯会被更多鸟友看到'+(isNew?' 🎉 加新':''));
+  else toast('已发布 ✅ 周边鸟友可以看到你的鸟讯了'+(isNew?' 🎉 加新':''));
 }
 function openUnknown(){
   $('report-modal').innerHTML = `
@@ -686,6 +749,8 @@ function publishUnknown(desc){
   SIGHTINGS.push(s);
   myReports.push(s.id);
   myStats.reports++;
+  POSTS.unshift(autoPostFromSighting(s)); // 自动生成"求鉴定"帖
+  renderPosts();
   closeReport();
   renderProfile();
   addSightingMarker(s);
@@ -695,6 +760,56 @@ function publishUnknown(desc){
   b.innerHTML = `🔔 <b>待鉴定推送</b>（模拟）：「${esc(desc.slice(0,18))}…」已推送给周边鸟友帮认`;
   b.style.display='block';
   setTimeout(()=>{ if(b.style.display==='block') b.style.display='none'; }, 6000);
+}
+
+/* ============ 图片识鸟（上报入口 · 懂鸟模拟） ============ */
+function openImgRec(){
+  $('report-modal').innerHTML = `
+    <h2>📷 照片识鸟</h2>
+    <p style="font-size:12.5px;color:var(--muted)">拍到了清晰照片但不认识鸟？上传照片，懂鸟 AI 帮你识别定种（演示为模拟，正式版调 HHOLOVE API）。</p>
+    <div class="label">上传照片</div>
+    <input type="file" accept="image/*" onchange="imgRecPicked(this)">
+    <div id="img-rec-status" class="up-file"></div>
+    <div class="row-btns" style="margin-top:14px">
+      <button class="pill-btn" onclick="openReport()">← 返回手动选鸟种</button>
+      <button class="pill-btn" style="border-color:var(--purple);color:var(--purple)" onclick="closeReport();openUnknown()">没拍清 → 待鉴定描述</button>
+    </div>`;
+}
+function imgRecPicked(inp){
+  if(!inp.files || !inp.files[0]) return;
+  $('img-rec-status').innerHTML = '🔎 懂鸟识别中…（演示模拟，约 1 秒）';
+  setTimeout(()=>{
+    if(Math.random()<0.15){
+      $('img-rec-status').innerHTML = `<div style="color:var(--orange);margin-top:8px;line-height:1.7">😕 照片不够清晰，识别失败。<br>建议换个角度再拍，或转"待鉴定"请鸟友帮忙。</div>`;
+      return;
+    }
+    const sp = SPECIES[Math.floor(Math.random()*SPECIES.length)];
+    if(sp.prot===1){
+      // 识别结果为禁报清单物种 → 拦截
+      $('block-modal').innerHTML = `
+        <div class="warn-icon">🛑</div>
+        <h2 style="text-align:center">识别结果：${sp.name}</h2>
+        <p style="margin:10px 0">「${sp.name}」为<b style="color:var(--danger)">国家一级保护动物</b>，在禁报清单中，已自动拦截。</p>
+        <p>看到它，请为它保密——不公开精确位置、不追逐、不诱拍。</p>
+        <div class="row-btns" style="justify-content:center;margin-top:16px">
+          <button class="pill-btn danger" onclick="document.getElementById('block-mask').classList.remove('show');openReport()">知道了</button>
+        </div>`;
+      $('block-mask').classList.add('show');
+      return;
+    }
+    $('img-rec-status').innerHTML = `
+      <div class="sr-item" style="background:var(--green-light);margin-top:8px">识别结果：可能是 <b>${sp.emoji} ${sp.name}</b>（置信度 ${88+Math.floor(Math.random()*10)}%）</div>
+      <div class="row-btns" style="margin-top:10px">
+        <button class="pill-btn primary" onclick="confirmImgRec(${sp.id})">就报它 ✓</button>
+        <button class="pill-btn" onclick="openReport()">不对，重新选</button>
+      </div>`;
+  }, 1200);
+}
+function confirmImgRec(spid){
+  reportPhoto = 'AI识别照片.jpg';
+  pendingNote = '';
+  closeReport();
+  publishReport(byId[spid], {verified:true, rec:true}); // 识别结果即核验结果，直接发布已核验鸟讯
 }
 
 /* ============ 鸟种详情（悬浮百科页，任何地方点鸟名打开） ============ */
@@ -742,78 +857,131 @@ function linkify(t){
 }
 
 /* ============ 社区（发帖/点赞/评论） ============ */
-function sightingPostTemplate(sid){
-  const s = SIGHTINGS.find(x=>x.id===sid);
-  const sp = s.sp ? byId[s.sp] : null;
-  if(!sp) return {cat:'求助鉴定', body:`我在附近看到一只不认识的小鸟，描述：「${s.unknown||''}」。大家帮我看看是什么鸟？`};
-  return {cat:'鸟讯讨论', body:`刚在附近看到【${sp.name}】${spIsRare(sp)?'（罕见鸟！）':''}，${s.count}只，有鸟友一起蹲吗？坐标见鸟讯。`};
-}
-function openCompose(tpl){
-  const t = tpl || {cat:'自由分享', body:''};
+function openCompose(){
   $('compose-modal').innerHTML = `
     <h2>✍️ 发帖</h2>
-    <p style="font-size:12px;color:var(--muted)">已按场景生成模板，你可以随意修改</p>
+    <p style="font-size:12px;color:var(--muted)">看到鸟想分享？直接发帖（上报鸟讯会自动生成"鸟讯帖"，无需再发）</p>
     <div class="label">话题</div>
     <div class="opt-chips" id="cp-cats">
-      ${['求助鉴定','鸟讯讨论','新手交流','自由分享'].map(c=>`<button class="opt-chip ${c===t.cat?'sel':''}" onclick="pickCat('${c}')">${c}</button>`).join('')}
+      ${['求鉴定','讨论','分享'].map(c=>`<button class="opt-chip ${c===cpCat?'sel':''}" onclick="pickCat('${c}')">${c}</button>`).join('')}
     </div>
     <div class="label">内容</div>
-    <textarea id="cp-body">${t.body}</textarea>
+    <textarea id="cp-body"></textarea>
     <div class="row-btns" style="margin-top:14px">
       <button class="pill-btn primary" onclick="publishPost()">发布</button>
       <button class="pill-btn" onclick="closeCompose()">取消</button>
     </div>`;
   $('compose-mask').classList.add('show');
 }
-let cpCat = '自由分享';
+let cpCat = '分享';
 function pickCat(c){ cpCat = c; document.querySelectorAll('#cp-cats .opt-chip').forEach(b=>b.classList.toggle('sel', b.textContent===c)); }
 function closeCompose(){ $('compose-mask').classList.remove('show'); }
 function publishPost(){
   const body = $('cp-body').value.trim();
   if(!body){ toast('写点什么再发布吧'); return; }
-  POSTS.unshift({id:Date.now(),cat:cpCat,author:my.nickname,avatar:my.avatar,minAgo:0,body,emoji:cpCat==='求助鉴定'?'❓':cpCat==='鸟讯讨论'?'🗺️':cpCat==='新手交流'?'🙋':'🐦',likes:0,liked:false,comments:[]});
+  POSTS.unshift({id:Date.now(),cat:cpCat,author:my.nickname,avatar:my.avatar,minAgo:0,area:'海淀区',body,emoji:cpCat==='求鉴定'?'❓':cpCat==='讨论'?'💬':'🐦',likes:0,liked:false,comments:[]});
   closeCompose();
-  cpCat='自由分享';
+  cpCat='分享';
   renderPosts();
   toast('发布成功！社区鸟友可以看到你的帖子了 🎉');
 }
+/* 筛选状态：区域 / 类型 / 排序 */
+let commArea='all', commType='all', commSort='hot';
+function heatOf(p){
+  let likes = p.likes||0, checks = 0;
+  if(p.sid){ const s=SIGHTINGS.find(x=>x.id===p.sid); if(s){ likes=s.likes; checks=s.checks; } }
+  return likes + checks + ((p.comments&&p.comments.length)||0)*2;
+}
+function ageOf(p){ return p.sid ? (SIGHTINGS.find(x=>x.id===p.sid)||p).min : p.minAgo; }
+function heatComments(cs){ return [...cs].sort((a,b)=>(b.l||0)-(a.l||0)); }
 function renderPosts(){
-  $('post-list').innerHTML = POSTS.map(p=>`
+  const list = POSTS.filter(p=>{
+    if(p.sid && !SIGHTINGS.some(x=>x.id===p.sid)) return false;
+    if(commArea!=='all' && p.area!==commArea) return false;
+    if(commType!=='all' && p.cat!==commType) return false;
+    return true;
+  }).sort((a,b)=> commSort==='hot' ? (heatOf(b)-heatOf(a))||(ageOf(a)-ageOf(b)) : ageOf(a)-ageOf(b));
+  $('post-list').innerHTML = list.length ? list.map(p=>{
+    const s = p.sid ? SIGHTINGS.find(x=>x.id===p.sid) : null;
+    const cs = heatComments(p.comments);
+    return `
     <div class="post">
       <div class="p-head">
         <div class="ava">${p.avatar}</div>
         <div style="flex:1">
-          <div class="p-name">${p.author} <span class="chip ${p.cat==='求助鉴定'?'purple':p.cat==='鸟讯讨论'?'orange':'green'}">${p.cat}</span></div>
-          <div class="p-time">${fmtMin(p.minAgo)}</div>
+          <div class="p-name">${p.author} <span class="chip ${p.cat==='求鉴定'?'purple':p.cat==='鸟讯'?'orange':p.cat==='分享'?'gold':'green'}">${p.cat}</span>${s&&s.resolved?`<span class="chip green">已解决</span>`:''}${p.area?`<span class="chip gray">${p.area}</span>`:''}</div>
+          <div class="p-time">${fmtMin(ageOf(p))}</div>
         </div>
       </div>
       <div class="p-body">${linkify(p.body)}<span style="font-size:36px;display:block;margin-top:4px">${p.emoji}</span></div>
       <div class="p-acts">
-        <span class="${p.liked?'liked':''}" onclick="likePost(${p.id})">${p.liked?'❤️':'🤍'} ${p.likes}</span>
+        ${s
+          ? `<span onclick="likeSightingPost(${p.sid})">❤️ 围观 ${s.likes}</span><span onclick="checkSightingPost(${p.sid})">✅ 打卡 ${s.checks}</span>${!s.sp&&s.reporter===my.nickname&&!s.resolved?`<span style="color:var(--green);font-weight:600" onclick="resolveUnknown(${p.sid})">✓ 已解决</span>`:''}`
+          : `<span class="${p.liked?'liked':''}" onclick="likePost(${p.id})">${p.liked?'❤️':'🤍'} ${p.likes}</span>`}
         <span onclick="togglePostComments(${p.id})">💬 ${p.comments.length} 条评论</span>
+        ${s?`<span style="color:var(--green);font-weight:600" onclick="openDetail(SIGHTINGS.find(x=>x.id===${p.sid}))">📍 查看鸟讯</span>`:''}
       </div>
       <div class="p-comments" id="pc-${p.id}">
-        ${p.comments.map(c=>`<div class="c"><b>${c.u}</b>：${c.t}</div>`).join('')||'<div class="c" style="color:var(--muted)">还没有评论</div>'}
+        ${cs.map((c,i)=>`<div class="c"><b>${c.u}</b>：${c.t}<span class="cmt-like" onclick="likeComment('p',${p.id},${i})">${c.l?'❤️ '+c.l:'🤍'}</span></div>`).join('')||'<div class="c" style="color:var(--muted)">还没有评论</div>'}
         <div class="comment-input">
           <input type="text" id="pc-input-${p.id}" placeholder="友善发言…" onkeydown="if(event.key==='Enter')commentPost(${p.id})">
           <button class="pill-btn primary" style="padding:7px 13px" onclick="commentPost(${p.id})">发送</button>
         </div>
       </div>
     </div>
-  `).join('');
+  `}).join('') : '<div class="empty-hint" style="padding:30px 0">没有符合条件的帖子，换个筛选看看</div>';
 }
 function likePost(id){ const p=POSTS.find(x=>x.id===id); p.liked=!p.liked; p.likes+=p.liked?1:-1; renderPosts(); }
+function likeSightingPost(sid){ const s=SIGHTINGS.find(x=>x.id===sid); s.likes++; renderPosts(); }
+function checkSightingPost(sid){ const s=SIGHTINGS.find(x=>x.id===sid); s.checks++; myStats.checks++; renderProfile(); renderPosts(); }
 function togglePostComments(id){ const el=$('pc-'+id); if(el) el.classList.toggle('show'); }
 function commentPost(id){
   const inp=$('pc-input-'+id); const txt=inp.value.trim();
   if(!txt){ toast('写点什么吧'); return; }
   const p=POSTS.find(x=>x.id===id);
-  p.comments.push({u:my.nickname,t:txt});
+  p.comments.push({u:my.nickname,t:txt,l:0});
   inp.value='';
   renderPosts();
   const el=$('pc-'+id); if(el) el.classList.add('show');
-  toast('评论成功 💬');
+  toast('评论成功 💬'+(p.sid?'（已同步到鸟讯留言）':''));
 }
+/* 留言=评论共享：鸟讯里发的评论和帖子里的评论是同一个列表，按热度排序 */
+function likeComment(kind, refid, i){
+  const obj = kind==='s' ? SIGHTINGS.find(x=>x.id===refid) : POSTS.find(x=>x.id===refid);
+  const cs = heatComments(obj.comments);
+  cs[i].l = (cs[i].l||0)+1;
+  if(kind==='s') openDetail(obj); else renderPosts();
+}
+function commentSighting(id){
+  const s=SIGHTINGS.find(x=>x.id===id);
+  const inp=$('sheet-cmt'); const txt=inp.value.trim();
+  if(!txt){ toast('写点什么吧'); return; }
+  s.comments.push({u:my.nickname,t:txt,l:0});
+  openDetail(s);
+  toast('留言成功 💬 已同步到社区帖子');
+}
+function resolveUnknown(id){
+  const s=SIGHTINGS.find(x=>x.id===id);
+  s.resolved = true;
+  if(map) renderSightings();
+  renderPosts();
+  renderProfile();
+  closeSheet();
+  toast('已标记解决 ✅ 待鉴定气泡已从地图移除，帖子保留');
+}
+/* 筛选栏交互 */
+document.querySelectorAll('#f-area .opt-chip').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#f-area .opt-chip').forEach(x=>x.classList.remove('sel')); b.classList.add('sel');
+  commArea=b.dataset.a; renderPosts();
+});
+document.querySelectorAll('#f-type .opt-chip').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#f-type .opt-chip').forEach(x=>x.classList.remove('sel')); b.classList.add('sel');
+  commType=b.dataset.t; renderPosts();
+});
+document.querySelectorAll('#f-sort .opt-chip').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#f-sort .opt-chip').forEach(x=>x.classList.remove('sel')); b.classList.add('sel');
+  commSort=b.dataset.s; renderPosts();
+});
 
 /* ============ 本地鸟种手册 ============ */
 let hbRegion='全市', hbFilter='all';
@@ -876,7 +1044,7 @@ function renderProfile(){
     const s = SIGHTINGS.find(x=>x.id===id);
     if(!s) return '';
     const sp = s.sp ? byId[s.sp] : null;
-    return `<div class="bird-row"><span>${sp?sp.emoji:'❓'} ${sp?`<span class="bl" onclick="openSpecies('${sp.name}')">${sp.name}</span>`:'待鉴定'}<small style="color:var(--muted)"> ${fmtMin(s.min)}</small></span>
+    return `<div class="bird-row"><span>${sp?sp.emoji:'❓'} ${sp?`<span class="bl" onclick="openSpecies('${sp.name}')">${sp.name}</span>`:'待鉴定'}${s.resolved?`<span class="chip green" style="margin-left:4px">已解决</span>`:''}<small style="color:var(--muted)"> ${fmtMin(s.min)}</small></span>
       <span><button class="link-btn" onclick="editMyReport(${id})">编辑</button><button class="link-btn" style="color:var(--danger)" onclick="delMyReport(${id})">删除</button></span></div>`;
   }).join('') : '<div class="empty-hint">还没有上报记录。去地图点"＋ 我看到了鸟"发布第一条 🐦</div>';
 }
@@ -899,18 +1067,23 @@ function meCount(id,d){ const s=SIGHTINGS.find(x=>x.id===id); s.count=Math.max(1
 function saveMyReport(id){
   const s = SIGHTINGS.find(x=>x.id===id);
   s.note = $('me-note').value.trim();
+  const p = POSTS.find(x=>x.sid===id);
+  if(p) p.body = autoPostFromSighting(s).body; // 同步更新关联帖子文案
   closeReport();
   renderProfile();
-  toast('已保存 ✅');
+  renderPosts();
+  toast('已保存 ✅（关联帖子已同步）');
 }
 function delMyReport(id){
   const i = SIGHTINGS.findIndex(x=>x.id===id);
   if(i>=0) SIGHTINGS.splice(i,1);
+  POSTS = POSTS.filter(x=>x.sid!==id); // 鸟讯=帖子：删除鸟讯同步删除关联帖子
   myReports = myReports.filter(x=>x!==id);
   myStats.reports = Math.max(0, myStats.reports-1);
   renderProfile();
+  renderPosts();
   if(map) renderSightings();
-  toast('已删除该上报');
+  toast('已删除该上报（关联帖子已同步删除）');
 }
 function openAvatarPick(){
   $('avatar-modal').innerHTML = `
@@ -995,15 +1168,17 @@ function addWish(name){
 /* ============ 演示说明 ============ */
 function openDemoNote(){
   $('note-modal').innerHTML = `
-    <h2>🐦 演示说明 v3</h2>
+    <h2>🐦 演示说明 v4</h2>
     <p style="font-size:13px">
     · 浏览器演示版，全部为内置演示数据（33 种鸟、16 条鸟讯、22 条手册记录）<br><br>
     · <b>地图</b>：绿气泡=常见鸟（随机展示，点"换一批"刷新）；橙框大圆=罕见鸟照片气泡；金色星=心愿鸟；紫"?"=待鉴定<br>
-    · <b>上报三流程</b>：①选鸟种+传照片 → 模拟懂鸟核验（约 80% 通过；20% 演示"改报 / 转待鉴定"）②没照片直接发布 ③点"未鉴定"按钮 → 描述（≥10 字）请大家帮认<br>
-    · 上报"金雕/黑颈鹤/黄胸鹀"等<b>国一</b>：提交时拦截并告知原因（国一隐藏，不产生任何鸟讯）<br>
-    · <b>点任意鸟名</b>（鸟讯详情/手册/帖子/心愿鸟）→ 悬浮鸟种详情页，右上角 ✕ 关闭，含该鸟全部历史鸟讯<br>
-    · <b>社区</b>：发帖/点赞/评论全流程可用；鸟讯详情有"发帖"按钮自动生成模板；帖子里的鸟名可点击<br>
-    · <b>我的</b>：改昵称/头像、心愿鸟（金色卡片，可点击）、我的鸟种库、<b>我的上报记录</b>（可编辑/删除）<br><br>
+    · <b>鸟讯 = 帖子</b>：发布鸟讯自动生成帖子；鸟讯留言就是帖子评论（双向同步、按热度排序）；围观/打卡同步到帖子；帖子可点"📍 查看鸟讯"跳回<br>
+    · <b>上报</b>：①选鸟种+传照片 → 模拟懂鸟核验（80% 通过；20% 演示"改报/转待鉴定"）②没照片直接发布 ③点"未鉴定"→ 描述（≥10 字）④<b>拍到了但不认识</b>→"用照片识别鸟种"（懂鸟模拟，识别即核验）<br>
+    · 上传高清照片的鸟讯有<b>更高概率</b>被周边鸟友看到；上报"金雕"等<b>国一</b>：拦截并告知原因（不产生鸟讯）<br>
+    · <b>待鉴定"已解决"</b>：发布本人可点"✓ 已解决"——气泡从地图消失，帖子保留并显示"已解决"状态<br>
+    · <b>社区</b>：筛选（区域/类型：鸟讯·求鉴定·讨论·分享/排序：热度·最新）；发帖按钮悬浮固定不随滚动；帖子里的鸟名可点击进详情页<br>
+    · <b>点任意鸟名</b>→ 悬浮鸟种详情页（✕ 关闭，含该鸟全部历史鸟讯）<br>
+    · <b>我的</b>：改昵称/头像、心愿鸟、我的鸟种库、<b>我的上报记录</b>（编辑/删除，关联帖子同步）<br><br>
     审核状态（已核验/未核验）是内部排序依据，不对用户展示。产品名"等鸟"（暂定）。
     </p>
     <div class="row-btns" style="justify-content:center"><button class="pill-btn primary" onclick="document.getElementById('note-mask').classList.remove('show')">开始体验</button></div>`;
